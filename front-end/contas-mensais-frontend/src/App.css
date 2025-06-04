@@ -1,0 +1,197 @@
+/* ===== Estilo Global - Dark Theme Elegante ===== */
+body, hhtml {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #111827; /* cinza bem escuro */
+  color: #f3f4f6; /* quase branco */
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+main {
+  padding: 15px;
+  min-height: 100svh;
+  box-sizing: border-box;
+}
+
+/* ===== Título Principal ===== */
+h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  color: #e5e7eb;
+  margin-bottom: 24px;
+}
+
+.nome-conta {
+  font-size: 1.2rem;
+  text-align: left;
+  color: #10b981;
+  font-weight: bold;
+}
+
+/* ===== Seletor de Mês e Ano ===== */
+.seletor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.seletor select,
+.seletor input {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #4b5563;
+  background-color: #1f2937;
+  color: #f9fafb;
+  font-size: 1.1rem;
+}
+
+/* ===== Formulário de Nova Conta ===== */
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.formulario input {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #374151;
+  background-color: #1f2937;
+  color: #f9fafb;
+  font-size: 1.1rem;
+}
+
+.formulario button {
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  background-color: #6366f1; /* Indigo */
+  border: none;
+  border-radius: 10px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.formulario button:hover {
+  background-color: #4f46e5;
+}
+
+/* ===== Lista de Contas ===== */
+.lista {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lista li {
+  background-color: #1f2937;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #f3f4f6;
+}
+
+/* Conta Paga */
+.lista li.paga {
+  background-color: #16a34a22; /* verde com transparência */
+  border: 1px solid #16a34a;
+  color: #d1fae5;
+}
+
+/* Campos da Conta */
+.lista li span {
+  font-size: 0.95rem;
+}
+
+/* Ações */
+.lista li div {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* Botões */
+.lista button {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.lista button:hover {
+  opacity: 0.9;
+}
+
+.lista button.pagar {
+  background-color: #10b981; /* verde */
+  color: white;
+}
+
+.lista button.desmarcar {
+  background-color: #facc15; /* amarelo */
+  color: #1f2937;
+}
+
+.lista button.remover {
+  background-color: #ef4444; /* vermelho */
+  color: white;
+}
+
+.btn-flutuante {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  background-color: #6366f1;
+  color: white;
+  border-radius: 50%;
+  font-size: 2rem;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.3s ease;
+}
+
+.btn-flutuante:hover {
+  background-color: #4f46e5;
+}
+
+.total-mes {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #10b981;
+  font-weight: bold;
+}
+
+.grafico-container {
+  margin-top: 40px;
+  background-color: #1f2937;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  color: #f9fafb;
+}
+
+.grafico-container h2 {
+  text-align: center;
+  margin-bottom: 12px;
+  color: #f9fafb;
+}
+
+

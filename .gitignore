@@ -1,0 +1,39 @@
+# ============================
+# GERAL
+# ============================
+.env
+*.db
+*.sqlite
+*.log
+*.user
+*.suo
+*.DS_Store
+Thumbs.db
+
+# ============================
+# FRONTEND - React + TypeScript
+# ============================
+/front-end/node_modules/
+front-end/build/
+front-end/dist/
+front-end/.env
+front-end/.turbo/
+front-end/.next/
+front-end/.eslintcache
+
+# ============================
+# BACKEND - .NET 9.0
+# ============================
+/back-end/bin/
+/back-end/obj/
+/back-end/.vs/
+/back-end/.vscode/
+/back-end/.idea/
+back-end/appsettings.Development.json
+back-end/secrets.json
+back-end/*.db
+back-end/*.sqlite
+
+# User Secrets (armazenados fora do projeto)
+**/secrets.json
+**/secrets/*
