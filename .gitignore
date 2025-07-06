@@ -31,8 +31,6 @@ front-end/.eslintcache
 /back-end/.idea/
 back-end/appsettings.Development.json
 back-end/secrets.json
-back-end/*.db
-back-end/*.sqlite
 
 # User Secrets (armazenados fora do projeto)
 **/secrets.json
