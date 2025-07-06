@@ -1,0 +1,29 @@
+name: Build containers do projeto
+
+on:
+  push:
+    branches:
+      - main # Só executa quando há push para a branch principal
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Permite rodar manualmente no GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # O CI será executado em uma VM Linux da Github
+
+    steps:
+      - name: Clonar o repositório
+        uses: actions/checkout@v3
+
+      - name: Criar arquivo .env
+        run: |
+          echo "API_PORT=5000" >> .env
+          echo "FRONTEND_PORT=3000" >> .env
+          echo "ASPNETCORE_ENVIRONMENT=Development" >> .env
+          echo "VITE_API_URL=http://localhost:5000" >> .env
+
+      - name: Contruir os containers com Docker Compose
+        run: |
+          docker-compose --env-file .env build
