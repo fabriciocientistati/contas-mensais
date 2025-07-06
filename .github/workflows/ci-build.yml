@@ -24,11 +24,11 @@ jobs:
           echo "ASPNETCORE_ENVIRONMENT=Development" >> .env
           echo "VITE_API_URL=http://localhost:5000" >> .env
 
-      - name: Instalar Docker Compose
+      - name: Install Docker Compose
         run: |
-          sudo apt-get update
-          sudo apt-get install docker-compose-plugin
-          docker compose version
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
 
       - name: Contruir os containers com Docker Compose
         run: |
