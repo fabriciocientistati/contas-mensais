@@ -14,17 +14,29 @@ const ListaContas = () => {
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [atualizacaoGrafico , setAtualizacaoGrafico] = useState(0);
 
-  const totalMes = contas.reduce((total, conta) => {
-    return total + conta.valorParcela * conta.quantidadeParcelas;
-  }, 0);
+const totalMes = contas.length
+  ? contas.reduce((total, conta) =>
+      total + (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0), 0)
+  : 0;
 
   const carregar = () => {
     api.get<Conta[]>(`/contas?ano=${ano}&mes=${mes}`)
-      .then(res => setContas(res.data));
+      .then(res => {
+        console.log('Contas recebidas:', res.data);
+        const dados = res.data;
+        // Protege contra respostas inválidas, mesmo que raras
+        const contasSeguras = Array.isArray(dados) ? dados : [];
+        setContas(contasSeguras);
+      })
+      .catch(err => {
+        console.error('Erro ao buscar contas:', err);
+        setContas([]); // Garante que nunca passe valor indefinido
+      });
   };
 
   useEffect(() => {
     carregar();
+    console.log('Buscando contas para:', ano, mes);
   }, [ano, mes]);
 
   const alternarPagamento = (conta: Conta) => {

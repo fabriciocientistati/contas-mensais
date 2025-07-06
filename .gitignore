@@ -2,6 +2,7 @@
 # GERAL
 # ============================
 .env
+*/data/
 *.db
 *.sqlite
 *.log
@@ -33,6 +34,7 @@ back-end/appsettings.Development.json
 back-end/secrets.json
 back-end/*.db
 back-end/*.sqlite
+back-end/*data
 
 # User Secrets (armazenados fora do projeto)
 **/secrets.json

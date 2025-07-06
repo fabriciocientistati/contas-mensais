@@ -29,6 +29,12 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated(); // Garante a criação do banco na pasta /data
+}
+
 app.UseCors("CorsPolicy");
 
 // Rotas
@@ -37,6 +43,13 @@ app.MapGet("/", async (AppDbContext db) =>
 {
     return await db.Contas.ToListAsync();
 });
+
+// app.Map("/", async () =>
+// {
+//     // Retorna uma mensagem simples para a raiz
+//     return Results.Ok("API de Contas a Pagar");
+// });
+
 
 app.MapGet("/contas", async (int ano, int mes, AppDbContext db) =>
 {

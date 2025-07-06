@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface Props {
   ano: number;
   mes: number;
