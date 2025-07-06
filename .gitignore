@@ -2,8 +2,6 @@
 # GERAL
 # ============================
 .env
-*.db
-*.sqlite
 *.log
 *.user
 *.suo
