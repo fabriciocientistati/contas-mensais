@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Desenvolvimento\\ContasMensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj": {}
+    "C:\\Desenvolvimento\\contas-mensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj": {}
   },
   "projects": {
-    "C:\\Desenvolvimento\\ContasMensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj": {
+    "C:\\Desenvolvimento\\contas-mensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Desenvolvimento\\ContasMensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj",
+        "projectUniqueName": "C:\\Desenvolvimento\\contas-mensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj",
         "projectName": "ContasMensais.API",
-        "projectPath": "C:\\Desenvolvimento\\ContasMensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj",
+        "projectPath": "C:\\Desenvolvimento\\contas-mensais\\back-end\\ContasMensais.API\\ContasMensais.API.csproj",
         "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "C:\\Desenvolvimento\\ContasMensais\\back-end\\ContasMensais.API\\obj\\",
+        "outputPath": "C:\\Desenvolvimento\\contas-mensais\\back-end\\ContasMensais.API\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\User\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -53,6 +53,10 @@
             "Microsoft.EntityFrameworkCore.Sqlite": {
               "target": "Package",
               "version": "[9.0.5, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[9.0.4, )"
             }
           },
           "imports": [
