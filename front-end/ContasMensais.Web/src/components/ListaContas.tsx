@@ -115,12 +115,12 @@ const ListaContas = () => {
             <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
               <span className='nome-conta'>{conta.nome}</span>
               <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
-              <span>Parcela: R$ {new Intl.NumberFormat('pt-BR', {
+              <span>Parcela: {new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
               }).format(conta.valorParcela)}</span>
               <span>Qtd: {conta.quantidadeParcelas}</span>
-              <span>Total: R$ {new Intl.NumberFormat('pt-BR', {
+              <span>Total: {new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
               }).format(conta.valorTotal)}</span>
