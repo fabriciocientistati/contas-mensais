@@ -4,20 +4,23 @@ using Microsoft.VisualBasic;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.Listen(System.Net.IPAddress.Any, 5000);
+});
+
+// Configurações
 builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
     .AddEnvironmentVariables();
 
+// Gerando log de ambiente e conexão
 Console.WriteLine($"Ambiente: {builder.Environment.EnvironmentName}");
 Console.WriteLine($"Conexão: {builder.Configuration.GetConnectionString("DefaultConnection") ?? "NÃO ENCONTRADA"}");
 
-builder.WebHost.ConfigureKestrel(serverOptions =>
-{
-    serverOptions.Listen(System.Net.IPAddress.Any, 5000);
-});
-
+// Banco de dados
 if (builder.Environment.IsDevelopment())
 {
     Console.WriteLine("📦 Usando SQLite no ambiente Development");
@@ -31,7 +34,6 @@ else
         options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 }
-
 
 // Ativar CORS
 builder.Services.AddCors(options =>
@@ -56,7 +58,6 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated(); // Garante a criação do banco
 }
 
-
 app.UseCors("CorsPolicy");
 
 // Rotas
@@ -72,7 +73,7 @@ app.MapGet("/", async (AppDbContext db) =>
 //     return Results.Ok("API de Contas a Pagar");
 // });
 
-
+// GET all (com DTO)
 app.MapGet("/contas", async (int ano, int mes, AppDbContext db) =>
 {
     var contas = await db.Contas
@@ -80,32 +81,64 @@ app.MapGet("/contas", async (int ano, int mes, AppDbContext db) =>
         .OrderBy(c => c.Nome)
         .ToListAsync();
 
-    return Results.Ok(contas);
+    var dtos = contas.Select(c => new ContaDto
+    {
+        Id = c.Id,
+        Nome = c.Nome,
+        Ano = c.Ano,
+        Mes = c.Mes,
+        Paga = c.Paga,
+        DataVencimento = c.DataVencimento,
+        ValorParcela = c.ValorParcela,
+        QuantidadeParcelas = c.QuantidadeParcelas
+    });
+
+    return Results.Ok(dtos);
 });
 
-app.MapPost("/contas", async (Conta nova, AppDbContext db) =>
+app.MapPost("/contas", async (ContaDto dto, AppDbContext db) =>
 {
-    nova.Paga = false;
+    var nova = new Conta
+    {
+        Nome = dto.Nome,
+        Ano = dto.Ano,
+        Mes = dto.Mes,
+        Paga = false,
+        DataVencimento = dto.DataVencimento,
+        ValorParcela = dto.ValorParcela,
+        QuantidadeParcelas = dto.QuantidadeParcelas
+    };
+
     db.Contas.Add(nova);
     await db.SaveChangesAsync();
-    return Results.Created($"/contas/{nova.Id}", nova);
+
+    dto.Id = nova.Id;
+    dto.Paga = false;
+
+    return Results.Created($"/contas/{dto.Id}", dto);
 });
 
+// PUT pagar
 app.MapPut("/contas/{id}/pagar", async (Guid id, AppDbContext db) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
+
     conta.Paga = true;
     await db.SaveChangesAsync();
+
     return Results.Ok();
 });
 
+// PUT desmarcar 
 app.MapPut("/contas/{id}/desmarcar", async (Guid id, AppDbContext db) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
+
     conta.Paga = false;
     await db.SaveChangesAsync();
+
     return Results.Ok();
 });
 
@@ -113,24 +146,13 @@ app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
+    
     db.Contas.Remove(conta);
     await db.SaveChangesAsync();
+
     return Results.NoContent();
 });
-
 
 app.Run();
 
 
-public class Conta
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Nome { get; set; } = string.Empty;
-    public int Ano { get; set; }
-    public int Mes { get; set; }
-    public bool Paga { get; set; } = false;
-    public DateOnly DataVencimento { get; set; }
-    public decimal ValorParcela { get; set; }
-    public int QuantidadeParcelas { get; set; }
-    public decimal ValorTotal => Math.Round(ValorParcela * QuantidadeParcelas, 2);
-}
