@@ -1,44 +1,81 @@
-import { useState } from 'react';
+import { toast } from 'react-toastify';
+import { useEffect, useState } from 'react';
 import api from '../services/api';
 import type { Conta } from '../types/Conta';
 
 interface Props {
   ano: number;
   mes: number;
-  onContaAdicionada: (conta: Conta) => void;
+  contaParaEditar?: Conta | null;
+  onContaSalva: (conta: Conta) => void;
 }
 
-const FormularioNovaConta = ({ ano, mes, onContaAdicionada }: Props) => {
+const hoje = new Date();
+const dia = String(hoje.getDate()).padStart(2, '0');
+const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
+const anoAtual = hoje.getFullYear();
+const dataFormatada = `${anoAtual}-${mesAtual}-${dia}`; // formato YYYY-MM-DD para input[type="date"]
+
+const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContaSalva }: Props) => {
   const [nome, setNome] = useState('');
-  const [dataVencimento, setDataVencimento] = useState('');
-  const [valorParcela, setvalorParcela] = useState('');
-  const [quantidadeParcelas, setQuantidadeParcelas] = useState('');
+  const [dataVencimento, setDataVencimento] = useState(dataFormatada);
+  const [valorParcela, setValorParcela] = useState('');
+  const [quantidadeParcelas, setQuantidadeParcelas] = useState('1');
 
-  const adicionar = () => {
-    if (!nome.trim() || !valorParcela) {
-      alert('Campo nome ou valor da parcela são invalidos.')
+  useEffect(() => {
+    if (contaParaEditar) {
+      setNome(contaParaEditar.nome);
+      setDataVencimento(contaParaEditar.dataVencimento.split('T')[0]);
+      setValorParcela(contaParaEditar.valorParcela.toString());
+      setQuantidadeParcelas(contaParaEditar.quantidadeParcelas.toString());
+    }
+  }, [contaParaEditar]);
+
+  const salvar = async () => {
+    if (!nome.trim() || !valorParcela || !quantidadeParcelas) {
+      toast.warn('Preencha todos os campos obrigatórios.');
       return;
-    } 
+    }
 
-    api.post<Conta>('/contas', {
+    const payload = {
       nome,
       ano,
       mes,
-      paga: false,
+      paga: contaParaEditar?.paga ?? false,
       dataVencimento,
       valorParcela: parseFloat(valorParcela),
       quantidadeParcelas: parseInt(quantidadeParcelas),
-    }).then(res => {
-      onContaAdicionada(res.data);
-      setNome('');
-      setDataVencimento('');
-      setQuantidadeParcelas('');
-    });
+    };
+
+    try {
+      const res = contaParaEditar
+        ? await api.put<Conta>(`/contas/${contaParaEditar.id}`, payload)
+        : await api.post<Conta>('/contas', payload);
+
+      onContaSalva(res.data);
+      resetarFormulario();
+
+      toast.success(
+        contaParaEditar
+          ? 'Conta atualizada com sucesso!'
+          : 'Conta adicionada com sucesso!'
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao salvar a conta. Tente novamente.');
+    }
+  };
+
+  const resetarFormulario = () => {
+    setNome('');
+    setDataVencimento(dataFormatada);
+    setValorParcela('');
+    setQuantidadeParcelas('1');
   };
 
   return (
     <div className='formulario'>
-      <input 
+      <input
         type='text'
         placeholder='Digite o nome da conta...'
         value={nome}
@@ -53,8 +90,8 @@ const FormularioNovaConta = ({ ano, mes, onContaAdicionada }: Props) => {
         type='number'
         placeholder='Digite o valor da parcela...'
         value={valorParcela}
-        onChange={(e => setvalorParcela(e.target.value))}
-        step={"0.01"}
+        onChange={e => setValorParcela(e.target.value)}
+        step='0.01'
       />
       <input
         type='number'
@@ -62,7 +99,9 @@ const FormularioNovaConta = ({ ano, mes, onContaAdicionada }: Props) => {
         value={quantidadeParcelas}
         onChange={e => setQuantidadeParcelas(e.target.value)}
       />
-      <button onClick={adicionar}>Adicionar</button>
+      <button onClick={salvar}>
+        {contaParaEditar ? 'Salvar alterações' : 'Salvar'}
+      </button>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic;
+using Microsoft.AspNetCore.Mvc; // Necessário para usar [FromBody]
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,6 +117,34 @@ app.MapPost("/contas", async (ContaDto dto, AppDbContext db) =>
     dto.Paga = false;
 
     return Results.Created($"/contas/{dto.Id}", dto);
+});
+
+app.MapPut("/contas/{id}", async (Guid id, [FromBody] ContaDto dto, AppDbContext db) =>
+{
+    var contaExistente = await db.Contas.FindAsync(id);
+    if (contaExistente is null) return Results.NotFound();
+
+    contaExistente.Nome = dto.Nome;
+    contaExistente.Ano = dto.Ano;
+    contaExistente.Mes = dto.Mes;
+    contaExistente.DataVencimento = dto.DataVencimento;
+    contaExistente.ValorParcela = dto.ValorParcela;
+    contaExistente.QuantidadeParcelas = dto.QuantidadeParcelas;
+    contaExistente.Paga = dto.Paga;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new ContaDto
+    {
+        Id = contaExistente.Id,
+        Nome = contaExistente.Nome,
+        Ano = contaExistente.Ano,
+        Mes = contaExistente.Mes,
+        Paga = contaExistente.Paga,
+        DataVencimento = contaExistente.DataVencimento,
+        ValorParcela = contaExistente.ValorParcela,
+        QuantidadeParcelas = contaExistente.QuantidadeParcelas
+    });
 });
 
 // PUT pagar

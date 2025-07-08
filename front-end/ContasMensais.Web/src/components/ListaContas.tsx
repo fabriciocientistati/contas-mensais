@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import api from '../services/api';
 import type { Conta } from '../types/Conta';
 import FormularioNovaConta from './FormularioNovaConta';
 import SeletorMesAno from './SeletorMesAno';
-import { FaTrash, FaCheck, FaUndo } from 'react-icons/fa';
+import { FaTrash, FaCheck, FaUndo, FaEdit } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import GraficoTotais from './GraficoTotais';
@@ -12,31 +14,29 @@ const ListaContas = () => {
   const [contas, setContas] = useState<Conta[]>([]);
   const [ano, setAno] = useState<number>(new Date().getFullYear());
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
-  const [atualizacaoGrafico , setAtualizacaoGrafico] = useState(0);
+  const [atualizacaoGrafico, setAtualizacaoGrafico] = useState(0);
+  const [contaEditando, setContaEditando] = useState<Conta | null>(null);
 
-const totalMes = contas.length
-  ? contas.reduce((total, conta) =>
-      total + (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0), 0)
-  : 0;
+  const totalMes = contas.length
+    ? contas.reduce((total, conta) =>
+        total + (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0), 0)
+    : 0;
 
   const carregar = () => {
     api.get<Conta[]>(`/contas?ano=${ano}&mes=${mes}`)
       .then(res => {
-        console.log('Contas recebidas:', res.data);
         const dados = res.data;
-        // Protege contra respostas inválidas, mesmo que raras
         const contasSeguras = Array.isArray(dados) ? dados : [];
         setContas(contasSeguras);
       })
       .catch(err => {
         console.error('Erro ao buscar contas:', err);
-        setContas([]); // Garante que nunca passe valor indefinido
+        setContas([]);
       });
   };
 
   useEffect(() => {
     carregar();
-    console.log('Buscando contas para:', ano, mes);
   }, [ano, mes]);
 
   const alternarPagamento = (conta: Conta) => {
@@ -48,51 +48,80 @@ const totalMes = contas.length
     });
   };
 
-  const remover = (id: string) => {
-    api.delete(`/contas/${id}`).then(() => {
-      setContas(prev => prev.filter(c => c.id !== id));
-      setAtualizacaoGrafico(prev => prev + 1);
-    });
-  };
+const remover = (id: string) => {
+  Swal.fire({
+    title: 'Tem certeza?',
+    text: 'Essa ação não poderá ser desfeita!',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sim, apagar',
+    cancelButtonText: 'Cancelar'
+  }).then(result => {
+    if (result.isConfirmed) {
+      api.delete(`/contas/${id}`).then(() => {
+        setContas(prev => prev.filter(c => c.id !== id));
+        setAtualizacaoGrafico(prev => prev + 1);
+        toast.success('Conta removida com sucesso.');
+      }).catch(() => {
+        toast.error('Erro ao remover a conta.');
+      });
+    }
+  });
+};
 
-  const adicionarConta = (nova: Conta) => {
-    setContas(prev => [...prev, nova]);
-    setAtualizacaoGrafico(prev => prev + 1); //Força atualização do gráfico
+  const salvarConta = (conta: Conta) => {
+    setContaEditando(null);
+    setContas(prev => {
+      const semConta = prev.filter(c => c.id !== conta.id); // remove se já existir
+      return [conta, ...semConta]; // adiciona no topo
+    });
+    setAtualizacaoGrafico(prev => prev + 1);
   };
 
   return (
     <div>
       <SeletorMesAno ano={ano} mes={mes} onChange={(a, m) => { setAno(a); setMes(m); }} />
-      <FormularioNovaConta ano={ano} mes={mes} onContaAdicionada={adicionarConta} />
+      <FormularioNovaConta
+        ano={ano}
+        mes={mes}
+        contaParaEditar={contaEditando}
+        onContaSalva={salvarConta}
+      />
       <ul className="lista">
         {contas.map(conta => (
-        <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
-          <span className='nome-conta'>{conta.nome}</span>
-          <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>  
-          <span>Parcela: R$ {conta.valorParcela.toFixed(2)}</span>
-          <span>Qtd: {conta.quantidadeParcelas}</span>
-          <span>Total: R$ {conta.valorTotal.toFixed(2)}</span>
-          <div>
-            <button
-              className={conta.paga ? 'desmarcar' : 'pagar'}
-              onClick={() => alternarPagamento(conta)}
-            >
-              {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
-            </button>
+          <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
+            <span className='nome-conta'>{conta.nome}</span>
+            <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
+            <span>Parcela: R$ {conta.valorParcela.toFixed(2)}</span>
+            <span>Qtd: {conta.quantidadeParcelas}</span>
+            <span>Total: R$ {conta.valorTotal.toFixed(2)}</span>
+            <div>
+              <button
+                className={conta.paga ? 'desmarcar' : 'pagar'}
+                onClick={() => alternarPagamento(conta)}
+              >
+                {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
+              </button>
 
-            <button className="remover" onClick={() => remover(conta.id)}>
-              <FaTrash /> Remover
-            </button>
-          </div>
-        </motion.li>
+              <button onClick={() => setContaEditando(conta)}>
+                <FaEdit /> Editar
+              </button>
+
+              <button className="remover" onClick={() => remover(conta.id)}>
+                <FaTrash /> Remover
+              </button>
+            </div>
+          </motion.li>
         ))}
       </ul>
+
       <div className="total-mes">
         Total do mês: R$ {totalMes.toFixed(2)}
       </div>
-      
-      <GraficoTotais ano={ano} atualizar={atualizacaoGrafico} />
 
+      <GraficoTotais ano={ano} atualizar={atualizacaoGrafico} />
     </div>
   );
 };
