@@ -14,5 +14,4 @@ secrets.json
 .idea/
 
 # Docker
-Dockerfile
 .dockerignore
