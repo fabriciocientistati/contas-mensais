@@ -16,6 +16,7 @@ const ListaContas = () => {
   const [mes, setMes] = useState<number>(new Date().getMonth() + 1);
   const [atualizacaoGrafico, setAtualizacaoGrafico] = useState(0);
   const [contaEditando, setContaEditando] = useState<Conta | null>(null);
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pagas' | 'nao-pagas'>('todas');
 
   const totalMes = contas.length
     ? contas.reduce((total, conta) =>
@@ -48,28 +49,28 @@ const ListaContas = () => {
     });
   };
 
-const remover = (id: string) => {
-  Swal.fire({
-    title: 'Tem certeza?',
-    text: 'Essa ação não poderá ser desfeita!',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#3085d6',
-    confirmButtonText: 'Sim, apagar',
-    cancelButtonText: 'Cancelar'
-  }).then(result => {
-    if (result.isConfirmed) {
-      api.delete(`/contas/${id}`).then(() => {
-        setContas(prev => prev.filter(c => c.id !== id));
-        setAtualizacaoGrafico(prev => prev + 1);
-        toast.success('Conta removida com sucesso.');
-      }).catch(() => {
-        toast.error('Erro ao remover a conta.');
-      });
-    }
-  });
-};
+  const remover = (id: string) => {
+    Swal.fire({
+      title: 'Tem certeza?',
+      text: 'Essa ação não poderá ser desfeita!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sim, apagar',
+      cancelButtonText: 'Cancelar'
+    }).then(result => {
+      if (result.isConfirmed) {
+        api.delete(`/contas/${id}`).then(() => {
+          setContas(prev => prev.filter(c => c.id !== id));
+          setAtualizacaoGrafico(prev => prev + 1);
+          toast.success('Conta removida com sucesso.');
+        }).catch(() => {
+          toast.error('Erro ao remover a conta.');
+        });
+      }
+    });
+  };
 
   const salvarConta = (conta: Conta) => {
     setContaEditando(null);
@@ -89,37 +90,66 @@ const remover = (id: string) => {
         contaParaEditar={contaEditando}
         onContaSalva={salvarConta}
       />
+
+      <div className="filtro-status" style={{ margin: '10px 0' }}>
+        <label htmlFor="filtro" style={{ marginRight: '8px' }}>Filtrar por:</label>
+        <select
+          id="filtro"
+          value={filtroStatus}
+          onChange={e => setFiltroStatus(e.target.value as 'todas' | 'pagas' | 'nao-pagas')}
+        >
+          <option value="todas">Todas</option>
+          <option value="pagas">Pagas</option>
+          <option value="nao-pagas">Não pagas</option>
+        </select>
+      </div>
+
       <ul className="lista">
-        {contas.map(conta => (
-          <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
-            <span className='nome-conta'>{conta.nome}</span>
-            <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
-            <span>Parcela: R$ {conta.valorParcela.toFixed(2)}</span>
-            <span>Qtd: {conta.quantidadeParcelas}</span>
-            <span>Total: R$ {conta.valorTotal.toFixed(2)}</span>
-            <div>
-              <button
-                className={conta.paga ? 'desmarcar' : 'pagar'}
-                onClick={() => alternarPagamento(conta)}
-              >
-                {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
-              </button>
+        {contas
+          .filter(conta => {
+            if (filtroStatus === 'pagas') return conta.paga === true;
+            if (filtroStatus === 'nao-pagas') return conta.paga === false;
+            return true;
+          })
+          .map(conta => (
+            <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
+              <span className='nome-conta'>{conta.nome}</span>
+              <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
+              <span>Parcela: R$ {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              }).format(conta.valorParcela)}</span>
+              <span>Qtd: {conta.quantidadeParcelas}</span>
+              <span>Total: R$ {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              }).format(conta.valorTotal)}</span>
+              <div>
+                <button
+                  className={conta.paga ? 'desmarcar' : 'pagar'}
+                  onClick={() => alternarPagamento(conta)}
+                >
+                  {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
+                </button>
 
-              <button onClick={() => setContaEditando(conta)}>
-                <FaEdit /> Editar
-              </button>
+                <button onClick={() => setContaEditando(conta)}>
+                  <FaEdit /> Editar
+                </button>
 
-              <button className="remover" onClick={() => remover(conta.id)}>
-                <FaTrash /> Remover
-              </button>
-            </div>
-          </motion.li>
-        ))}
+                <button className="remover" onClick={() => remover(conta.id)}>
+                  <FaTrash /> Remover
+                </button>
+              </div>
+            </motion.li>
+          ))}
       </ul>
 
-      <div className="total-mes">
-        Total do mês: R$ {totalMes.toFixed(2)}
-      </div>
+    <div className="total-mes">
+      Total do mês: {new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(totalMes)}
+    </div>
 
       <GraficoTotais ano={ano} atualizar={atualizacaoGrafico} />
     </div>
