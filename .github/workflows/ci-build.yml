@@ -3,15 +3,15 @@ name: Build containers do projeto
 on:
   push:
     branches:
-      - main # Só executa quando há push para a branch principal
+      - main
   pull_request:
     branches:
       - main
-  workflow_dispatch: # Permite rodar manualmente no GitHub
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest # O CI será executado em uma VM Linux da Github
+    runs-on: ubuntu-latest
 
     steps:
       - name: Clonar o repositório
@@ -24,12 +24,13 @@ jobs:
           echo "ASPNETCORE_ENVIRONMENT=Development" >> .env
           echo "VITE_API_URL=http://localhost:5000" >> .env
 
-      - name: Install Docker Compose
+      - name: Instalar Docker Compose
         run: |
           sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
-      - name: Contruir os containers com Docker Compose
+      - name: Buildar containers backend e frontend
         run: |
-          docker compose --env-file .env build
+          docker compose --env-file .env -f docker-compose.yaml build
+        working-directory: ./
