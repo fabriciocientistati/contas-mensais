@@ -1,35 +1,46 @@
-# ============================
-# GERAL
-# ============================
-.env
+# ---------------------
+# BACKEND (.NET Core)
+# ---------------------
+**/bin/
+**/obj/
+**/Properties/launchSettings.json
+**/appsettings.*.json       # manter apenas se quiser esconder produção
+**/appsettings.json         # apenas se usar em produção via env
+**/secrets.json
+**/*.db                     # banco SQLite local
+
+# docker
+**/Dockerfile
+**/.dockerignore
+**/data/
+
+# Publish output
+**/publish/
+**/out/
+
+# IDEs
+.vscode/
+.idea/
+
+# ---------------------
+# FRONTEND (React + Vite)
+# ---------------------
+**/node_modules/
+**/dist/
+**/.env
+**/.env.*                   # todas as variações (dev, production)
+
+# NPM / Yarn
+**/package-lock.json
+**/yarn.lock
+
+# Log & OS files
 *.log
-*.user
-*.suo
 *.DS_Store
 Thumbs.db
 
-# ============================
-# FRONTEND - React + TypeScript
-# ============================
-/front-end/node_modules/
-front-end/build/
-front-end/dist/
-front-end/.env
-front-end/.turbo/
-front-end/.next/
-front-end/.eslintcache
-
-# ============================
-# BACKEND - .NET 9.0
-# ============================
-/back-end/bin/
-/back-end/obj/
-/back-end/.vs/
-/back-end/.vscode/
-/back-end/.idea/
-back-end/appsettings.Development.json
-back-end/secrets.json
-
-# User Secrets (armazenados fora do projeto)
-**/secrets.json
-**/secrets/*
+# ---------------------
+# GERAL
+# ---------------------
+.env
+.env.*

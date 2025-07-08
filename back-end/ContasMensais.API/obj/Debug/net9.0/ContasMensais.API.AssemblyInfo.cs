@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ContasMensais.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a7c75b75977ff67a5a6de9338dc0becee572fb86")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+539d8f4d4fe88477ee1306d9e36052c40ed308d2")]
 [assembly: System.Reflection.AssemblyProductAttribute("ContasMensais.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ContasMensais.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
