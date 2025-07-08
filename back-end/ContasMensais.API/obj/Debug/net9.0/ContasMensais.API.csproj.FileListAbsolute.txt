@@ -593,3 +593,4 @@ C:\Desenvolvimento\contas-mensais\back-end\ContasMensais.API\obj\Debug\net9.0\re
 C:\Desenvolvimento\contas-mensais\back-end\ContasMensais.API\obj\Debug\net9.0\ContasMensais.API.pdb
 C:\Desenvolvimento\contas-mensais\back-end\ContasMensais.API\obj\Debug\net9.0\ContasMensais.API.genruntimeconfig.cache
 C:\Desenvolvimento\contas-mensais\back-end\ContasMensais.API\obj\Debug\net9.0\ref\ContasMensais.API.dll
+C:\Desenvolvimento\contas-mensais\back-end\ContasMensais.API\bin\Debug\net9.0\appsettings.Development.json
