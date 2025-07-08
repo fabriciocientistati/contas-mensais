@@ -1,0 +1,18 @@
+bin/
+obj/
+data/
+*.db
+
+# Configs locais
+appsettings.*.json
+secrets.json
+*.user
+*.suo
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+Dockerfile
+.dockerignore

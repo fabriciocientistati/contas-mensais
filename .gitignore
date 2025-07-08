@@ -1,46 +1,17 @@
-# ---------------------
-# BACKEND (.NET Core)
-# ---------------------
-**/bin/
-**/obj/
-**/Properties/launchSettings.json
-**/appsettings.*.json       # manter apenas se quiser esconder produção
-**/appsettings.json         # apenas se usar em produção via env
-**/secrets.json
-**/*.db                     # banco SQLite local
+# Variáveis de ambiente
+.env
+.env.*
 
-# docker
-**/Dockerfile
-**/.dockerignore
-**/data/
-
-# Publish output
-**/publish/
-**/out/
-
-# IDEs
-.vscode/
-.idea/
-
-# ---------------------
-# FRONTEND (React + Vite)
-# ---------------------
-**/node_modules/
-**/dist/
-**/.env
-**/.env.*                   # todas as variações (dev, production)
-
-# NPM / Yarn
-**/package-lock.json
-**/yarn.lock
-
-# Log & OS files
+# Logs do sistema
 *.log
 *.DS_Store
 Thumbs.db
 
-# ---------------------
-# GERAL
-# ---------------------
-.env
-.env.*
+# Docker
+**/data/
+**/Dockerfile
+**/.dockerignore
+
+# Build geral
+**/publish/
+**/out/
