@@ -26,7 +26,7 @@ if (builder.Environment.IsDevelopment())
 {
     Console.WriteLine("📦 Usando SQLite no ambiente Development");
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db"));
 }
 else
 {
@@ -73,6 +73,21 @@ app.MapGet("/", async (AppDbContext db) =>
 //     // Retorna uma mensagem simples para a raiz
 //     return Results.Ok("API de Contas a Pagar");
 // });
+
+app.MapGet("/contas/busca", async (string valor, AppDbContext db) =>
+{
+    if (string.IsNullOrEmpty(valor))
+        return Results.BadRequest("Informe um valor para busca.");
+
+    var contas = await db.Contas
+        .AsNoTracking()
+        .Where(c => c.Nome.ToLower().Contains(valor.ToLower()))
+        .ToListAsync();
+
+    return contas.Any()
+        ? Results.Ok(contas)
+        : Results.NotFound("Nenhuma conta encontrada com o valor informado.");
+});
 
 // GET all (com DTO)
 app.MapGet("/contas", async (int ano, int mes, AppDbContext db) =>

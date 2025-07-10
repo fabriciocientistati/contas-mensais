@@ -9,5 +9,6 @@ public class Conta
     public DateOnly DataVencimento { get; set; }
     public decimal ValorParcela { get; set; }
     public int QuantidadeParcelas { get; set; }
-    public decimal ValorTotal => Math.Round(ValorParcela * QuantidadeParcelas, 2);
+    public decimal ValorTotalParcelas => Math.Round(ValorParcela * QuantidadeParcelas, 2);
+    public decimal ValorTotalMensal => Math.Round(ValorParcela * QuantidadeParcelas, 2);
 }

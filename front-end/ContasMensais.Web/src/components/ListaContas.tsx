@@ -17,6 +17,7 @@ const ListaContas = () => {
   const [atualizacaoGrafico, setAtualizacaoGrafico] = useState(0);
   const [contaEditando, setContaEditando] = useState<Conta | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pagas' | 'nao-pagas'>('todas');
+  const [busca, setBusca] = useState('');
 
   const totalMes = contas.length
     ? contas.reduce((total, conta) =>
@@ -36,6 +37,24 @@ const ListaContas = () => {
       });
   };
 
+  const buscarContas = () => {
+    if (!busca.trim()) {
+      carregar();
+      return;
+    }
+  
+
+  api.get<Conta[]>(`/contas/busca?valor=${encodeURIComponent(busca)}`)
+    .then(res => {
+      setContas(res.data);
+    })
+    .catch(err => {
+      toast.error('Nenhuma conta encontrada.');
+      setContas([]);
+      console.error('Erro ao buscar contas:', err);
+    })
+  }
+  
   useEffect(() => {
     carregar();
   }, [ano, mes]);
@@ -102,6 +121,19 @@ const ListaContas = () => {
           <option value="pagas">Pagas</option>
           <option value="nao-pagas">Não pagas</option>
         </select>
+      </div>
+
+      <div style={{ margin: '10px 0' }}>
+        <input
+          type="text"
+          placeholder="Buscar contas pelo nome..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          style={{ padding: '6px', width: '300px', marginRight: '8px' }}
+        />
+        <button onClick={buscarContas} style={{ padding: '6px 12px' }}>
+          Buscar
+        </button>
       </div>
 
       <ul className="lista">
