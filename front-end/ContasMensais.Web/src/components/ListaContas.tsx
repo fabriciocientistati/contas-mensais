@@ -37,27 +37,30 @@ const ListaContas = () => {
       });
   };
 
-  const buscarContas = () => {
+  useEffect(() => {
+    carregar();
+  }, [ano, mes]);
+
+  useEffect(() => {
     if (!busca.trim()) {
       carregar();
       return;
     }
-  
 
-  api.get<Conta[]>(`/contas/busca?valor=${encodeURIComponent(busca)}`)
-    .then(res => {
-      setContas(res.data);
-    })
-    .catch(err => {
-      toast.error('Nenhuma conta encontrada.');
-      setContas([]);
-      console.error('Erro ao buscar contas:', err);
-    })
-  }
-  
-  useEffect(() => {
-    carregar();
-  }, [ano, mes]);
+  const delayDebounce = setTimeout(() => {
+    api.get<Conta[]>(`/contas/busca?valor=${encodeURIComponent(busca)}&ano=${ano}&mes=${mes}`)
+      .then(res => {
+        setContas(res.data);
+      })
+      .catch(err => {
+        toast.error('Nenhuma conta encontrada.');
+        setContas([]);
+        console.error('Erro ao buscar contas:', err);
+      });
+  }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [busca]);
 
   const alternarPagamento = (conta: Conta) => {
     const rota = conta.paga ? 'desmarcar' : 'pagar';
@@ -94,8 +97,8 @@ const ListaContas = () => {
   const salvarConta = (conta: Conta) => {
     setContaEditando(null);
     setContas(prev => {
-      const semConta = prev.filter(c => c.id !== conta.id); // remove se já existir
-      return [conta, ...semConta]; // adiciona no topo
+      const semConta = prev.filter(c => c.id !== conta.id);
+      return [conta, ...semConta];
     });
     setAtualizacaoGrafico(prev => prev + 1);
   };
@@ -110,30 +113,40 @@ const ListaContas = () => {
         onContaSalva={salvarConta}
       />
 
-      <div className="filtro-status" style={{ margin: '10px 0' }}>
-        <label htmlFor="filtro" style={{ marginRight: '8px' }}>Filtrar por:</label>
-        <select
-          id="filtro"
-          value={filtroStatus}
-          onChange={e => setFiltroStatus(e.target.value as 'todas' | 'pagas' | 'nao-pagas')}
-        >
-          <option value="todas">Todas</option>
-          <option value="pagas">Pagas</option>
-          <option value="nao-pagas">Não pagas</option>
-        </select>
-      </div>
-
       <div style={{ margin: '10px 0' }}>
         <input
           type="text"
           placeholder="Buscar contas pelo nome..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          style={{ padding: '6px', width: '300px', marginRight: '8px' }}
+          style={{
+            padding: '10px',
+            width: '100%',
+            fontSize: '16px',
+            boxSizing: 'border-box'
+          }}
         />
-        <button onClick={buscarContas} style={{ padding: '6px 12px' }}>
-          Buscar
-        </button>
+      </div>
+
+      <div style={{ margin: '10px 0' }}>
+        <label htmlFor="filtro" style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
+          Filtrar por:
+        </label>
+        <select
+          id="filtro"
+          value={filtroStatus}
+          onChange={e => setFiltroStatus(e.target.value as 'todas' | 'pagas' | 'nao-pagas')}
+          style={{
+            padding: '10px',
+            width: '100%',
+            fontSize: '16px',
+            boxSizing: 'border-box'
+          }}
+        >
+          <option value="todas">Todas</option>
+          <option value="pagas">Pagas</option>
+          <option value="nao-pagas">Não pagas</option>
+        </select>
       </div>
 
       <ul className="lista">
@@ -145,7 +158,17 @@ const ListaContas = () => {
           })
           .map(conta => (
             <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
-              <span className='nome-conta'>{conta.nome}</span>
+              <span className='nome-conta'>
+                {busca.trim()
+                  ? conta.nome.split(new RegExp(`(${busca})`, 'gi')).map((parte, i) =>
+                      parte.toLowerCase() === busca.toLowerCase() ? (
+                        <mark key={i} style={{ backgroundColor: 'yellow' }}>{parte}</mark>
+                      ) : (
+                        <span key={i}>{parte}</span>
+                      )
+                    )
+                  : conta.nome}
+              </span>
               <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
               <span>Parcela: {new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
@@ -155,7 +178,7 @@ const ListaContas = () => {
               <span>Total: {new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',
-              }).format(conta.valorTotal)}</span>
+              }).format((conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 1))}</span>
               <div>
                 <button
                   className={conta.paga ? 'desmarcar' : 'pagar'}
@@ -164,7 +187,10 @@ const ListaContas = () => {
                   {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
                 </button>
 
-                <button onClick={() => setContaEditando(conta)}>
+                <button onClick={() => {
+                  setContaEditando(conta);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}>
                   <FaEdit /> Editar
                 </button>
 
@@ -176,12 +202,12 @@ const ListaContas = () => {
           ))}
       </ul>
 
-    <div className="total-mes">
-      Total do mês: {new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(totalMes)}
-    </div>
+      <div className="total-mes">
+        Total do mês: {new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(totalMes)}
+      </div>
 
       <GraficoTotais ano={ano} atualizar={atualizacaoGrafico} />
     </div>

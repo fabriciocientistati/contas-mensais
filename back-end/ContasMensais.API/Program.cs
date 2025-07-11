@@ -74,19 +74,32 @@ app.MapGet("/", async (AppDbContext db) =>
 //     return Results.Ok("API de Contas a Pagar");
 // });
 
-app.MapGet("/contas/busca", async (string valor, AppDbContext db) =>
+app.MapGet("/contas/busca", async (
+    [FromQuery] string valor,
+    [FromQuery] int? ano,
+    [FromQuery] int? mes,
+    AppDbContext db) =>
 {
-    if (string.IsNullOrEmpty(valor))
+    if (string.IsNullOrWhiteSpace(valor))
         return Results.BadRequest("Informe um valor para busca.");
 
-    var contas = await db.Contas
+    var query = db.Contas
         .AsNoTracking()
-        .Where(c => c.Nome.ToLower().Contains(valor.ToLower()))
+        .Where(c => c.Nome.ToLower().Contains(valor.ToLower()));
+
+    if (ano.HasValue)
+        query = query.Where(c => c.Ano == ano.Value);
+
+    if (mes.HasValue)
+        query = query.Where(c => c.Mes == mes.Value);
+
+    var contas = await query
+        .OrderBy(c => c.Nome)
         .ToListAsync();
 
     return contas.Any()
         ? Results.Ok(contas)
-        : Results.NotFound("Nenhuma conta encontrada com o valor informado.");
+        : Results.NotFound("Nenhuma conta encontrada com os filtros informados.");
 });
 
 // GET all (com DTO)
