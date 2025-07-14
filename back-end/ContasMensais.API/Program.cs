@@ -1,7 +1,11 @@
-using System;
+using ContasMensais.API.DbContext;
+using ContasMensais.API.Dtos;
+using ContasMensais.API.Models;
+using ContasMensais.API.Validators;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
-using Microsoft.AspNetCore.Mvc; // Necessário para usar [FromBody]
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +54,10 @@ builder.Services.AddCors(options =>
 
 // Adicionar serviço para documentação futuramente
 builder.Services.AddEndpointsApiExplorer();
+
+// FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<ContaValidators>();
 
 var app = builder.Build();
 
@@ -125,8 +133,17 @@ app.MapGet("/contas", async (int ano, int mes, AppDbContext db) =>
     return Results.Ok(dtos);
 });
 
-app.MapPost("/contas", async (ContaDto dto, AppDbContext db) =>
+app.MapPost("/contas", async (
+    [FromBody]ContaDto dto, 
+    IValidator<ContaDto> validator,
+    AppDbContext db) =>
 {
+    
+    var validationResult = await ContasMensais.API.Extensions.ValidationExtensions.Validate(dto, validator);
+
+    if (validationResult is not null)
+        return validationResult;
+    
     var nova = new Conta
     {
         Nome = dto.Nome,

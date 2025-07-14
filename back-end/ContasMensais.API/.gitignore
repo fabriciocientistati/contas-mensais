@@ -2,6 +2,10 @@ bin/
 obj/
 data/
 *.db
+*.db-shm
+*.db-wal
+contas.db-wal
+
 
 # Configs locais
 appsettings.*.json

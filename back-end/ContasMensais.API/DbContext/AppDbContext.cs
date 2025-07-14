@@ -1,6 +1,9 @@
+using ContasMensais.API.Models;
 using Microsoft.EntityFrameworkCore;
 
-public class AppDbContext : DbContext
+namespace ContasMensais.API.DbContext;
+
+public class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {}
 
