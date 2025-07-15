@@ -73,7 +73,7 @@ builder.Services.AddQuartz(q =>
     q.AddTrigger(opts => opts
         .ForJob(jobKey)
         .WithIdentity("EmailJob-trigger")
-        .WithCronSchedule("0/30 * * * * ?", x =>
+        .WithCronSchedule("0 0 8 * * ?", x =>
             x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
 });
 
