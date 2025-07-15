@@ -70,10 +70,18 @@ builder.Services.AddQuartz(q =>
 
     q.AddJob<EmailJob>(opts => opts.WithIdentity(jobKey));
 
+    // Trigger para 08:00 da manhã
     q.AddTrigger(opts => opts
         .ForJob(jobKey)
-        .WithIdentity("EmailJob-trigger")
+        .WithIdentity("EmailJob-trigger-08")
         .WithCronSchedule("0 0 8 * * ?", x =>
+            x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
+
+    // Trigger para 22:00 da noite
+    q.AddTrigger(opts => opts
+        .ForJob(jobKey)
+        .WithIdentity("EmailJob-trigger-22")
+        .WithCronSchedule("0 0 22 * * ?", x =>
             x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
 });
 
