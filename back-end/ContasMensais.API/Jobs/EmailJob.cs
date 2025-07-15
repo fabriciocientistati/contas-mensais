@@ -27,7 +27,7 @@ public class EmailJob : IJob
         Console.WriteLine($"[DEBUG] Senha vinda de User Secrets: {_settings.Senha.Substring(0, 4)}...");
 
         var contas = await _context.Contas
-            .Where(c => c.DataVencimento == hoje || c.DataVencimento == amanha)
+            .Where(c => (c.DataVencimento == hoje || c.DataVencimento == amanha) && c.Paga != true)
             .ToListAsync();
 
         if (!contas.Any())
