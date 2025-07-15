@@ -1,11 +1,13 @@
 using ContasMensais.API.DbContext;
 using ContasMensais.API.Dtos;
+using ContasMensais.API.Jobs;
 using ContasMensais.API.Models;
 using ContasMensais.API.Validators;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Quartz;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,11 +16,14 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.Listen(System.Net.IPAddress.Any, 5000);
 });
 
+Console.WriteLine("Fuso horário: " + TimeZoneInfo.Local);
+
 // Configurações
 builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
+    .AddUserSecrets<Program>() // 👈 Adiciona leitura dos secrets
     .AddEnvironmentVariables();
 
 // Gerando log de ambiente e conexão
@@ -58,6 +63,22 @@ builder.Services.AddEndpointsApiExplorer();
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<ContaValidators>();
+
+builder.Services.AddQuartz(q =>
+{
+    var jobKey = new JobKey("EmailJob");
+
+    q.AddJob<EmailJob>(opts => opts.WithIdentity(jobKey));
+
+    q.AddTrigger(opts => opts
+        .ForJob(jobKey)
+        .WithIdentity("EmailJob-trigger")
+        .WithCronSchedule("0/30 * * * * ?", x =>
+            x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
+});
+
+builder.Services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
+
 
 var app = builder.Build();
 
