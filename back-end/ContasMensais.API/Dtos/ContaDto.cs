@@ -12,4 +12,7 @@ public class ContaDto
     public decimal ValorParcela { get; set; }
     public int QuantidadeParcelas { get; set; }
     public decimal ValorTotal => Math.Round(ValorParcela * QuantidadeParcelas, 2);
+    public int IndiceParcela { get; set; }
+    public int TotalParcelas { get; set; }
+
 }

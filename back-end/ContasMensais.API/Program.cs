@@ -139,24 +139,44 @@ app.MapGet("/contas/busca", async (
         : Results.NotFound("Nenhuma conta encontrada com os filtros informados.");
 });
 
-// GET all (com DTO)
 app.MapGet("/contas", async (int ano, int mes, AppDbContext db) =>
 {
-    var contas = await db.Contas
+    var contasMes = await db.Contas
         .Where(c => c.Ano == ano && c.Mes == mes)
-        .OrderBy(c => c.Nome)
+        .OrderBy(c => c.DataVencimento)
         .ToListAsync();
 
-    var dtos = contas.Select(c => new ContaDto
+    // 🔁 Carregar todas as parcelas para poder agrupar corretamente por nome
+    var todasAsContas = await db.Contas
+        .AsNoTracking()
+        .ToListAsync();
+
+    // Agrupar por nome
+    var grupos = todasAsContas
+        .GroupBy(c => c.Nome)
+        .ToDictionary(
+            g => g.Key,
+            g => g.OrderBy(c => c.DataVencimento).ToList()
+        );
+
+    var dtos = contasMes.Select(c =>
     {
-        Id = c.Id,
-        Nome = c.Nome,
-        Ano = c.Ano,
-        Mes = c.Mes,
-        Paga = c.Paga,
-        DataVencimento = c.DataVencimento,
-        ValorParcela = c.ValorParcela,
-        QuantidadeParcelas = c.QuantidadeParcelas
+        var grupo = grupos[c.Nome];
+        var indice = grupo.FindIndex(p => p.Id == c.Id);
+
+        return new ContaDto
+        {
+            Id = c.Id,
+            Nome = c.Nome,
+            Ano = c.Ano,
+            Mes = c.Mes,
+            Paga = c.Paga,
+            DataVencimento = c.DataVencimento,
+            ValorParcela = c.ValorParcela,
+            QuantidadeParcelas = c.QuantidadeParcelas,
+            IndiceParcela = indice + 1,
+            TotalParcelas = grupo.Count
+        };
     });
 
     return Results.Ok(dtos);
@@ -167,58 +187,100 @@ app.MapPost("/contas", async (
     IValidator<ContaDto> validator,
     AppDbContext db) =>
 {
-    
     var validationResult = await ContasMensais.API.Extensions.ValidationExtensions.Validate(dto, validator);
 
     if (validationResult is not null)
         return validationResult;
-    
-    var nova = new Conta
-    {
-        Nome = dto.Nome,
-        Ano = dto.Ano,
-        Mes = dto.Mes,
-        Paga = false,
-        DataVencimento = dto.DataVencimento,
-        ValorParcela = dto.ValorParcela,
-        QuantidadeParcelas = dto.QuantidadeParcelas
-    };
 
-    db.Contas.Add(nova);
+    var contasCriadas = new List<ContaDto>();
+
+    for (int i = 0; i < dto.QuantidadeParcelas; i++)
+    {
+        var vencimento = dto.DataVencimento.AddMonths(i);
+        var ano = vencimento.Year;
+        var mes = vencimento.Month;
+
+        var nova = new Conta
+        {
+            Nome = dto.Nome,
+            Ano = ano,
+            Mes = mes,
+            Paga = false,
+            DataVencimento = vencimento,
+            ValorParcela = dto.ValorParcela,
+            QuantidadeParcelas = 1 // Cada conta representa uma parcela
+        };
+
+        db.Contas.Add(nova);
+
+        contasCriadas.Add(new ContaDto
+        {
+            Id = nova.Id,
+            Nome = nova.Nome,
+            Ano = nova.Ano,
+            Mes = nova.Mes,
+            Paga = false,
+            DataVencimento = nova.DataVencimento,
+            ValorParcela = nova.ValorParcela,
+            QuantidadeParcelas = 1
+        });
+    }
+
     await db.SaveChangesAsync();
 
-    dto.Id = nova.Id;
-    dto.Paga = false;
-
-    return Results.Created($"/contas/{dto.Id}", dto);
+    return Results.Created($"/contas", contasCriadas);
 });
 
 app.MapPut("/contas/{id}", async (Guid id, [FromBody] ContaDto dto, AppDbContext db) =>
 {
-    var contaExistente = await db.Contas.FindAsync(id);
-    if (contaExistente is null) return Results.NotFound();
+    var contaOriginal = await db.Contas.FindAsync(id);
+    if (contaOriginal is null)
+        return Results.NotFound();
 
-    contaExistente.Nome = dto.Nome;
-    contaExistente.Ano = dto.Ano;
-    contaExistente.Mes = dto.Mes;
-    contaExistente.DataVencimento = dto.DataVencimento;
-    contaExistente.ValorParcela = dto.ValorParcela;
-    contaExistente.QuantidadeParcelas = dto.QuantidadeParcelas;
-    contaExistente.Paga = dto.Paga;
+    // 1. Buscar todas as parcelas com mesmo nome e data base
+    var dataBase = contaOriginal.DataVencimento;
+    var grupoParcelas = await db.Contas
+        .Where(c => c.Nome == contaOriginal.Nome && c.DataVencimento >= dataBase)
+        .OrderBy(c => c.DataVencimento)
+        .ToListAsync();
+
+    // 2. Apagar todas as parcelas futuras relacionadas
+    db.Contas.RemoveRange(grupoParcelas);
+
+    // 3. Criar as novas parcelas
+    var novasParcelas = new List<Conta>();
+    for (int i = 0; i < dto.QuantidadeParcelas; i++)
+    {
+        var vencimento = dto.DataVencimento.AddMonths(i);
+        var nova = new Conta
+        {
+            Nome = dto.Nome,
+            Ano = vencimento.Year,
+            Mes = vencimento.Month,
+            DataVencimento = vencimento,
+            ValorParcela = dto.ValorParcela,
+            QuantidadeParcelas = 1,
+            Paga = false
+        };
+        novasParcelas.Add(nova);
+        db.Contas.Add(nova);
+    }
 
     await db.SaveChangesAsync();
 
-    return Results.Ok(new ContaDto
+    var dtos = novasParcelas.Select(n => new ContaDto
     {
-        Id = contaExistente.Id,
-        Nome = contaExistente.Nome,
-        Ano = contaExistente.Ano,
-        Mes = contaExistente.Mes,
-        Paga = contaExistente.Paga,
-        DataVencimento = contaExistente.DataVencimento,
-        ValorParcela = contaExistente.ValorParcela,
-        QuantidadeParcelas = contaExistente.QuantidadeParcelas
+        Id = n.Id,
+        Nome = n.Nome,
+        Ano = n.Ano,
+        Mes = n.Mes,
+        Paga = n.Paga,
+        DataVencimento = n.DataVencimento,
+        ValorParcela = n.ValorParcela,
+        QuantidadeParcelas = n.QuantidadeParcelas
     });
+
+    return Results.Ok(dtos);
 });
 
 // PUT pagar

@@ -8,7 +8,7 @@ interface Props {
   ano: number;
   mes: number;
   contaParaEditar?: Conta | null;
-  onContaSalva: (conta: Conta) => void;
+  onContasSalvas: (contas: Conta[]) => void;
 }
 
 const hoje = new Date();
@@ -17,8 +17,7 @@ const mesAtual = String(hoje.getMonth() + 1).padStart(2, '0');
 const anoAtual = hoje.getFullYear();
 const dataFormatada = `${anoAtual}-${mesAtual}-${dia}`;
 
-
-const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContaSalva }: Props) => {
+const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContasSalvas }: Props) => {
   const [nome, setNome] = useState('');
   const [dataVencimento, setDataVencimento] = useState(dataFormatada);
   const [valorParcela, setValorParcela] = useState('0');
@@ -26,7 +25,7 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContaSalva }: Props)
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const valorParcelaNumerico = parseFloat(valorParcela);
   const quantidadeParcelasNumerico = parseInt(quantidadeParcelas);
-  
+
   useEffect(() => {
     if (contaParaEditar) {
       setNome(contaParaEditar.nome);
@@ -38,8 +37,7 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContaSalva }: Props)
   }, [contaParaEditar]);
 
   const salvar = async () => {
-
-     if (isNaN(valorParcelaNumerico) || isNaN(quantidadeParcelasNumerico)) {
+    if (isNaN(valorParcelaNumerico) || isNaN(quantidadeParcelasNumerico)) {
       toast.error('Valor da parcela e quantidade de parcelas devem ser números válidos.');
       return;
     }
@@ -50,23 +48,25 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContaSalva }: Props)
       mes,
       paga: contaParaEditar?.paga ?? false,
       dataVencimento,
-      valorParcela: parseFloat(valorParcela),
-      quantidadeParcelas: parseInt(quantidadeParcelas),
+      valorParcela: valorParcelaNumerico,
+      quantidadeParcelas: quantidadeParcelasNumerico,
     };
-    console.log('Payload enviado para API:', payload);    
 
     try {
-      const res = contaParaEditar
-        ? await api.put<Conta>(`/contas/${contaParaEditar.id}`, payload)
-        : await api.post<Conta>('/contas', payload);
+      if (contaParaEditar) {
+        const res = await api.put<Conta>(`/contas/${contaParaEditar.id}`, payload);
+        onContasSalvas([res.data]); // envia como lista
+      } else {
+        const res = await api.post<Conta[]>('/contas', payload);
+        onContasSalvas(res.data);
+      }
 
-      onContaSalva(res.data);
       resetarFormulario();
 
       toast.success(
         contaParaEditar
           ? 'Conta atualizada com sucesso!'
-          : 'Conta adicionada com sucesso!'
+          : 'Conta(s) adicionada(s) com sucesso!'
       );
     } catch (err: any) {
       handleApiError(err, setErrors);

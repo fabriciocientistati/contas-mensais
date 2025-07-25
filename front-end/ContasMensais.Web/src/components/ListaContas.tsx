@@ -47,17 +47,17 @@ const ListaContas = () => {
       return;
     }
 
-  const delayDebounce = setTimeout(() => {
-    api.get<Conta[]>(`/contas/busca?valor=${encodeURIComponent(busca)}&ano=${ano}&mes=${mes}`)
-      .then(res => {
-        setContas(res.data);
-      })
-      .catch(err => {
-        toast.error('Nenhuma conta encontrada.');
-        setContas([]);
-        console.error('Erro ao buscar contas:', err);
-      });
-  }, 500);
+    const delayDebounce = setTimeout(() => {
+      api.get<Conta[]>(`/contas/busca?valor=${encodeURIComponent(busca)}&ano=${ano}&mes=${mes}`)
+        .then(res => {
+          setContas(res.data);
+        })
+        .catch(err => {
+          toast.error('Nenhuma conta encontrada.');
+          setContas([]);
+          console.error('Erro ao buscar contas:', err);
+        });
+    }, 500);
 
     return () => clearTimeout(delayDebounce);
   }, [busca]);
@@ -94,23 +94,42 @@ const ListaContas = () => {
     });
   };
 
-  const salvarConta = (conta: Conta) => {
-    setContaEditando(null);
-    setContas(prev => {
-      const semConta = prev.filter(c => c.id !== conta.id);
-      return [conta, ...semConta];
-    });
-    setAtualizacaoGrafico(prev => prev + 1);
+  const obterInfoParcelas = (conta: Conta) => {
+    const grupo = contas
+      .filter(c => c.nome === conta.nome)
+      .sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime());
+
+    const total = grupo.length;
+    const posicao = grupo.findIndex(c => c.id === conta.id) + 1;
+
+    return `${posicao}/${total}`;
   };
 
   return (
     <div>
       <SeletorMesAno ano={ano} mes={mes} onChange={(a, m) => { setAno(a); setMes(m); }} />
+
       <FormularioNovaConta
         ano={ano}
         mes={mes}
         contaParaEditar={contaEditando}
-        onContaSalva={salvarConta}
+        onContasSalvas={(contasCriadas) => {
+          setContaEditando(null);
+          setAtualizacaoGrafico(prev => prev + 1);
+
+          // ✅ Recarrega o mês atual para refletir alterações corretamente
+          carregar();
+
+          const contasDoMesAtual = contasCriadas.filter(c => c.ano === ano && c.mes === mes);
+
+          setContas(prev => {
+            const idsCriadas = contasCriadas.map(c => c.id);
+            const semEditadas = prev.filter(c => !idsCriadas.includes(c.id));
+            return [...contasDoMesAtual, ...semEditadas];
+          });
+
+          setAtualizacaoGrafico(prev => prev + 1);
+        }}
       />
 
       <div style={{ margin: '10px 0' }}>
@@ -174,7 +193,7 @@ const ListaContas = () => {
                 style: 'currency',
                 currency: 'BRL',
               }).format(conta.valorParcela)}</span>
-              <span>Qtd: {conta.quantidadeParcelas}</span>
+              <span>Qtd: <small style={{ color: '#666' }}>({conta.indiceParcela}/{conta.totalParcelas})</small></span>
               <span>Total: {new Intl.NumberFormat('pt-BR', {
                 style: 'currency',
                 currency: 'BRL',

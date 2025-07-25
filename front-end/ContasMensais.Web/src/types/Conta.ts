@@ -8,4 +8,8 @@ export interface Conta {
   valorParcela: number;
   quantidadeParcelas: number;
   valorTotal: number;
+  contaParaEditar?: Conta | null;
+  onContasSalvas: (contas: Conta[]) => void;
+  indiceParcela: number;
+  totalParcelas: number;
 }
