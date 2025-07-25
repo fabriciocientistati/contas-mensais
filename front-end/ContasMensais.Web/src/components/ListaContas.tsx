@@ -94,17 +94,6 @@ const ListaContas = () => {
     });
   };
 
-  const obterInfoParcelas = (conta: Conta) => {
-    const grupo = contas
-      .filter(c => c.nome === conta.nome)
-      .sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime());
-
-    const total = grupo.length;
-    const posicao = grupo.findIndex(c => c.id === conta.id) + 1;
-
-    return `${posicao}/${total}`;
-  };
-
   return (
     <div>
       <SeletorMesAno ano={ano} mes={mes} onChange={(a, m) => { setAno(a); setMes(m); }} />
