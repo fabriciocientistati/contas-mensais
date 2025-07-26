@@ -37,7 +37,7 @@ public class ContasPdfDocument : IDocument
 
                 foreach (var grupo in grupos)
                 {
-                    col.Item().PaddingBottom(5).Text($"📌 {grupo.Key}")
+                    col.Item().PaddingBottom(5).Text($"🔷 {grupo.Key}")
                         .FontSize(16).Bold().FontColor(Colors.Black);
 
                     col.Item().Table(table =>
@@ -73,7 +73,7 @@ public class ContasPdfDocument : IDocument
                             table.Cell().Element(CellDataStyle(bgColor)).Text(conta.DataVencimento.ToString("dd/MM/yyyy"));
                             table.Cell().Element(CellDataStyle(bgColor)).Text(conta.ValorParcela.ToString("C", new CultureInfo("pt-BR")));
                             table.Cell().Element(CellDataStyle(bgColor)).Text($"{conta.IndiceParcela}/{conta.TotalParcelas}");
-                            table.Cell().Element(CellDataStyle(bgColor)).Text(isPaga ? "✅ Paga" : "❌ Não paga");
+                            table.Cell().Element(CellDataStyle(bgColor)).Text(isPaga ? "✓ Paga" : "✗ Não paga");
                         }
 
                         static Func<IContainer, IContainer> CellDataStyle(string backgroundColor) =>
