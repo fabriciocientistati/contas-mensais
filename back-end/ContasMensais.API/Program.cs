@@ -8,8 +8,13 @@ using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Quartz;
+using QuestPDF.Fluent;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ✅ Define o tipo de licença gratuita para QuestPDF
+QuestPDF.Settings.License = LicenseType.Community;
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
@@ -23,14 +28,12 @@ builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
-    .AddUserSecrets<Program>() // 👈 Adiciona leitura dos secrets
+    .AddUserSecrets<Program>()
     .AddEnvironmentVariables();
 
-// Gerando log de ambiente e conexão
 Console.WriteLine($"Ambiente: {builder.Environment.EnvironmentName}");
 Console.WriteLine($"Conexão: {builder.Configuration.GetConnectionString("DefaultConnection") ?? "NÃO ENCONTRADA"}");
 
-// Banco de dados
 if (builder.Environment.IsDevelopment())
 {
     Console.WriteLine("📦 Usando SQLite no ambiente Development");
@@ -42,25 +45,17 @@ else
     Console.WriteLine("🐘 Usando PostgreSQL em Produção");
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 }
 
-// Ativar CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", policy =>
     {
-        policy
-        .AllowAnyOrigin()
-        .AllowAnyMethod()
-        .AllowAnyHeader();
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
     });
 });
 
-// Adicionar serviço para documentação futuramente
 builder.Services.AddEndpointsApiExplorer();
-
-// FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<ContaValidators>();
 
@@ -70,30 +65,21 @@ builder.Services.AddQuartz(q =>
 
     q.AddJob<EmailJob>(opts => opts.WithIdentity(jobKey));
 
-    // Trigger para 08:00 da manhã
-    q.AddTrigger(opts => opts
-        .ForJob(jobKey)
-        .WithIdentity("EmailJob-trigger-08")
-        .WithCronSchedule("0 0 8 * * ?", x =>
-            x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
+    q.AddTrigger(opts => opts.ForJob(jobKey).WithIdentity("EmailJob-trigger-08")
+        .WithCronSchedule("0 0 8 * * ?", x => x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
 
-    // Trigger para 22:00 da noite
-    q.AddTrigger(opts => opts
-        .ForJob(jobKey)
-        .WithIdentity("EmailJob-trigger-22")
-        .WithCronSchedule("0 0 22 * * ?", x =>
-            x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
+    q.AddTrigger(opts => opts.ForJob(jobKey).WithIdentity("EmailJob-trigger-22")
+        .WithCronSchedule("0 0 22 * * ?", x => x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
 });
 
 builder.Services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
-
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated(); // Garante a criação do banco
+    db.Database.EnsureCreated();
 }
 
 app.UseCors("CorsPolicy");
@@ -311,12 +297,70 @@ app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
-    
+
     db.Contas.Remove(conta);
     await db.SaveChangesAsync();
 
     return Results.NoContent();
 });
+
+app.MapGet("/contas/pdf", async (
+    int? ano, int? mes, string? status, string? nome,
+    AppDbContext db) =>
+{
+    var query = db.Contas.AsNoTracking();
+
+    if (ano.HasValue)
+        query = query.Where(c => c.Ano == ano.Value);
+
+    if (mes.HasValue)
+        query = query.Where(c => c.Mes == mes.Value);
+
+    if (!string.IsNullOrWhiteSpace(nome))
+        query = query.Where(c => c.Nome.ToLower().Contains(nome.ToLower()));
+
+    if (status == "pagas")
+        query = query.Where(c => c.Paga == true);
+    else if (status == "nao-pagas")
+        query = query.Where(c => c.Paga == false);
+
+    var contas = await query.OrderBy(c => c.Nome).ThenBy(c => c.DataVencimento).ToListAsync();
+
+    // Agrupa as contas por nome
+    var grupos = contas
+        .GroupBy(c => c.Nome)
+        .ToDictionary(
+            g => g.Key,
+            g => g.OrderBy(c => c.DataVencimento).ToList()
+        );
+
+    // Monta os DTOs com índice da parcela e total
+    var dtos = contas.Select(c =>
+    {
+        var grupo = grupos[c.Nome];
+        var indice = grupo.FindIndex(p => p.Id == c.Id);
+
+        return new ContaDto
+        {
+            Id = c.Id,
+            Nome = c.Nome,
+            Ano = c.Ano,
+            Mes = c.Mes,
+            Paga = c.Paga,
+            DataVencimento = c.DataVencimento,
+            ValorParcela = c.ValorParcela,
+            QuantidadeParcelas = c.QuantidadeParcelas,
+            IndiceParcela = indice + 1,
+            TotalParcelas = grupo.Count
+        };
+    }).ToList();
+
+    var pdf = new ContasPdfDocument(dtos);
+    var bytes = pdf.GeneratePdf();
+
+    return Results.File(bytes, "application/pdf", "Relatorio-Completo.pdf");
+});
+
 
 app.Run();
 

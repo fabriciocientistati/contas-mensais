@@ -93,6 +93,43 @@ const ListaContas = () => {
       }
     });
   };
+  
+  const gerarPdfCompleto = async () => {
+    try {
+      const response = await api.get('/contas/pdf', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Relatorio-Completo.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      toast.error('Erro ao gerar o PDF completo.');
+    }
+  };
+
+  const gerarPdfFiltrado = async () => {
+    try {
+      const params = new URLSearchParams({
+        ano: String(ano),
+        mes: String(mes),
+        status: filtroStatus,
+        nome: busca.trim()
+      });
+
+      const response = await api.get(`/contas/pdf?${params}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'Relatorio-Filtrado.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      toast.error('Erro ao gerar o PDF filtrado.');
+    }
+  };
 
   return (
     <div>
@@ -120,6 +157,12 @@ const ListaContas = () => {
           setAtualizacaoGrafico(prev => prev + 1);
         }}
       />
+
+    <div className="botoes-relatorio">
+      <button onClick={gerarPdfFiltrado}>📄 Gerar PDF filtrado</button>
+      <button onClick={gerarPdfCompleto}>📄 Gerar PDF completo</button>
+    </div>
+
 
       <div style={{ margin: '10px 0' }}>
         <input
@@ -195,7 +238,7 @@ const ListaContas = () => {
                   {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
                 </button>
 
-                <button onClick={() => {
+                <button className='editar' onClick={() => {
                   setContaEditando(conta);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}>
@@ -205,6 +248,7 @@ const ListaContas = () => {
                 <button className="remover" onClick={() => remover(conta.id)}>
                   <FaTrash /> Remover
                 </button>
+
               </div>
             </motion.li>
           ))}
@@ -218,6 +262,7 @@ const ListaContas = () => {
       </div>
 
       <GraficoTotais ano={ano} atualizar={atualizacaoGrafico} />
+
     </div>
   );
 };

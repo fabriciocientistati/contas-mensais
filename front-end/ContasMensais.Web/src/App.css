@@ -68,7 +68,7 @@ h1 {
   padding: 12px;
   font-size: 1rem;
   font-weight: bold;
-  background-color: #6366f1; /* Indigo */
+  background-color: #16a34a; /* Indigo */
   border: none;
   border-radius: 10px;
   color: white;
@@ -77,7 +77,7 @@ h1 {
 }
 
 .formulario button:hover {
-  background-color: #4f46e5;
+  background-color: #198754;
 }
 
 /* ===== Lista de Contas ===== */
@@ -150,6 +150,11 @@ h1 {
   color: white;
 }
 
+.lista button.editar {
+  background-color: #0dcaf0; /* azul */
+  color: white;
+}
+
 .btn-flutuante {
   position: fixed;
   bottom: 24px;
@@ -192,6 +197,41 @@ h1 {
   text-align: center;
   margin-bottom: 12px;
   color: #f9fafb;
+}
+
+.botao-pdf {
+  padding: 10px;
+  width: 100%;
+  font-size: 16px;
+  background-color: #3f51b5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.botoes-relatorio {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.botoes-relatorio button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  background-color: #3f51b5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.botoes-relatorio button:hover {
+  background-color: #303f9f;
 }
 
 
