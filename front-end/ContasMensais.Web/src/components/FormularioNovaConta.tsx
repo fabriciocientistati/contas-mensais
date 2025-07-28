@@ -1,4 +1,5 @@
 import { toast } from 'react-toastify';
+import { addToQueue } from '../utils/offlineQueue';
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import type { Conta } from '../types/Conta';
@@ -37,41 +38,51 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContasSalvas }: Prop
   }, [contaParaEditar]);
 
   const salvar = async () => {
-    if (isNaN(valorParcelaNumerico) || isNaN(quantidadeParcelasNumerico)) {
-      toast.error('Valor da parcela e quantidade de parcelas devem ser números válidos.');
-      return;
-    }
+  if (isNaN(valorParcelaNumerico) || isNaN(quantidadeParcelasNumerico)) {
+    toast.error('Valor da parcela e quantidade de parcelas devem ser números válidos.');
+    return;
+  }
 
-    const payload = {
-      nome,
-      ano,
-      mes,
-      paga: contaParaEditar?.paga ?? false,
-      dataVencimento,
-      valorParcela: valorParcelaNumerico,
-      quantidadeParcelas: quantidadeParcelasNumerico,
-    };
+  const payload = {
+    nome,
+    ano,
+    mes,
+    paga: contaParaEditar?.paga ?? false,
+    dataVencimento,
+    valorParcela: valorParcelaNumerico,
+    quantidadeParcelas: quantidadeParcelasNumerico,
+  };
 
-    try {
+  try {
+    if (navigator.onLine) {
       if (contaParaEditar) {
         const res = await api.put<Conta>(`/contas/${contaParaEditar.id}`, payload);
-        onContasSalvas([res.data]); // envia como lista
+        onContasSalvas([res.data]);
       } else {
         const res = await api.post<Conta[]>('/contas', payload);
         onContasSalvas(res.data);
       }
-
-      resetarFormulario();
 
       toast.success(
         contaParaEditar
           ? 'Conta atualizada com sucesso!'
           : 'Conta(s) adicionada(s) com sucesso!'
       );
-    } catch (err: any) {
-      handleApiError(err, setErrors);
+    } else {
+      addToQueue({
+        method: contaParaEditar ? 'PUT' : 'POST',
+        url: contaParaEditar ? `/contas/${contaParaEditar.id}` : '/contas',
+        data: payload
+      });
+
+      toast.success('Conta salva offline. Será sincronizada ao voltar à internet.');
     }
-  };
+
+    resetarFormulario();
+  } catch (err: any) {
+    handleApiError(err, setErrors);
+  }
+};
 
   const resetarFormulario = () => {
     setNome('');

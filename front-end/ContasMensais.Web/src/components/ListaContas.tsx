@@ -23,6 +23,18 @@ const ListaContas = () => {
     ? contas.reduce((total, conta) =>
         total + (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0), 0)
     : 0;
+    
+  useEffect(() => {
+    const listener = () => {
+      console.log('🔁 Esperando para recarregar...');
+      setTimeout(() => {
+        carregar();
+      }, 1000); // aguarda 1 segundo para garantir que a API terminou
+    };
+
+    window.addEventListener('sincronizacao-finalizada', listener);
+    return () => window.removeEventListener('sincronizacao-finalizada', listener);
+  }, []);
 
   const carregar = () => {
     api.get<Conta[]>(`/contas?ano=${ano}&mes=${mes}`)
@@ -30,6 +42,7 @@ const ListaContas = () => {
         const dados = res.data;
         const contasSeguras = Array.isArray(dados) ? dados : [];
         setContas(contasSeguras);
+        localStorage.setItem(`contas-cache-${ano}-${mes}`, JSON.stringify(contasSeguras));
       })
       .catch(err => {
         console.error('Erro ao buscar contas:', err);
@@ -38,10 +51,28 @@ const ListaContas = () => {
   };
 
   useEffect(() => {
+    if (!navigator.onLine) {
+      const cacheKey = `contas-cache-${ano}-${mes}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setContas(JSON.parse(cached));
+        console.log("📦 Carregado do cache offline:", cacheKey);
+      }
+      return;
+    }
     carregar();
   }, [ano, mes]);
 
   useEffect(() => {
+    if (!navigator.onLine) {
+      const cacheKey = `contas-cache-${ano}-${mes}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setContas(JSON.parse(cached));
+        console.log("📦 Carregado do cache offline:", cacheKey);
+      }
+      return;
+    }
     if (!busca.trim()) {
       carregar();
       return;
@@ -57,6 +88,16 @@ const ListaContas = () => {
           setContas([]);
           console.error('Erro ao buscar contas:', err);
         });
+
+useEffect(() => {
+  const listener = () => {
+    console.log('🔁 Recarregando após sincronização...');
+    carregar();
+  };
+  window.addEventListener('sincronizacao-finalizada', listener);
+
+  return () => window.removeEventListener('sincronizacao-finalizada', listener);
+}, []);
     }, 500);
 
     return () => clearTimeout(delayDebounce);
