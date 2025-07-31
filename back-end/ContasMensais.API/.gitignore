@@ -8,7 +8,6 @@ contas.db-wal
 
 
 # Configs locais
-appsettings.*.json
 secrets.json
 *.user
 *.suo

@@ -37,8 +37,13 @@ Console.WriteLine($"Conexão: {builder.Configuration.GetConnectionString("Defaul
 if (builder.Environment.IsDevelopment())
 {
     Console.WriteLine("📦 Usando SQLite no ambiente Development");
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db"));
+    var dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data");
+
+    if (!Directory.Exists(dataDir))
+        Directory.CreateDirectory(dataDir);
+
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db"));
 }
 else
 {
@@ -106,22 +111,43 @@ app.MapGet("/contas/busca", async (
     if (string.IsNullOrWhiteSpace(valor))
         return Results.BadRequest("Informe um valor para busca.");
 
-    var query = db.Contas
+    // Função para remover acentos e normalizar
+    string RemoverAcentos(string texto)
+    {
+        if (string.IsNullOrEmpty(texto)) return texto;
+        var normalized = texto.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder();
+        foreach (var c in normalized)
+        {
+            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+            if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(char.ToLowerInvariant(c));
+        }
+        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
+    }
+
+    var contas = await db.Contas
         .AsNoTracking()
-        .Where(c => c.Nome.ToLower().Contains(valor.ToLower()));
-
-    if (ano.HasValue)
-        query = query.Where(c => c.Ano == ano.Value);
-
-    if (mes.HasValue)
-        query = query.Where(c => c.Mes == mes.Value);
-
-    var contas = await query
-        .OrderBy(c => c.Nome)
         .ToListAsync();
 
-    return contas.Any()
-        ? Results.Ok(contas)
+    var valorBusca = RemoverAcentos(valor);
+
+    var filtradas = contas
+        .Where(c => RemoverAcentos(c.Nome).Contains(valorBusca))
+        .AsQueryable();
+
+    if (ano.HasValue)
+        filtradas = filtradas.Where(c => c.Ano == ano.Value);
+
+    if (mes.HasValue)
+        filtradas = filtradas.Where(c => c.Mes == mes.Value);
+
+    var resultado = filtradas
+        .OrderBy(c => c.Nome)
+        .ToList();
+
+    return resultado.Any()
+        ? Results.Ok(resultado)
         : Results.NotFound("Nenhuma conta encontrada com os filtros informados.");
 });
 
