@@ -100,6 +100,20 @@ h1 {
   color: #f3f4f6;
 }
 
+/* Conta Vencida */
+.lista li.vencida {
+  background-color: #fee2e2; /* vermelho claro */
+  border: 1px solid #ef4444;
+  color: #991b1b;
+}
+
+/* Conta Não Paga (mas não vencida) */
+.lista li.nao-paga {
+  background-color: #f0fdf4; /* verde claro */
+  border: 1px solid #10b981;
+  color: #065f46;
+}
+
 /* Conta Paga */
 .lista li.paga {
   background-color: #16a34a22; /* verde com transparência */

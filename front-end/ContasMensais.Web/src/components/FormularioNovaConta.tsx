@@ -32,7 +32,7 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContasSalvas }: Prop
       setNome(contaParaEditar.nome);
       setDataVencimento(contaParaEditar.dataVencimento.split('T')[0]);
       setValorParcela(contaParaEditar.valorParcela.toString());
-      setQuantidadeParcelas(contaParaEditar.quantidadeParcelas.toString());
+      setQuantidadeParcelas(contaParaEditar.totalParcelas?.toString() ?? contaParaEditar.quantidadeParcelas.toString());
       setErrors({});
     }
   }, [contaParaEditar]);

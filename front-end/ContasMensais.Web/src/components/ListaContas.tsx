@@ -172,6 +172,10 @@ useEffect(() => {
     }
   };
 
+  const isVencida = (conta: Conta) => {
+    return !conta.paga && dayjs(conta.dataVencimento).isBefore(dayjs(), 'day');
+  };
+
   return (
     <div>
       <SeletorMesAno ano={ano} mes={mes} onChange={(a, m) => { setAno(a); setMes(m); }} />
@@ -249,7 +253,16 @@ useEffect(() => {
             return true;
           })
           .map(conta => (
-            <motion.li key={conta.id} className={conta.paga ? 'paga' : ''}>
+            <motion.li
+              key={conta.id}
+              className={
+                conta.paga
+                  ? 'paga'
+                  : isVencida(conta)
+                    ? 'vencida'
+                    : 'nao-paga'
+              }
+            >
               <span className='nome-conta'>
                 {busca.trim()
                   ? conta.nome.split(new RegExp(`(${busca})`, 'gi')).map((parte, i) =>
