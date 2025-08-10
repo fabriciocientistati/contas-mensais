@@ -75,6 +75,17 @@ builder.Services.AddQuartz(q =>
 
     q.AddTrigger(opts => opts.ForJob(jobKey).WithIdentity("EmailJob-trigger-22")
         .WithCronSchedule("0 0 22 * * ?", x => x.InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("America/Cuiaba"))));
+
+    // 🔹 Dispara a cada segundo para teste
+    // q.AddTrigger(opts => opts
+    //     .ForJob(jobKey)
+    //     .WithIdentity("EmailJob-trigger-test")
+    //     .WithSimpleSchedule(x => x
+    //         .WithIntervalInSeconds(1)
+    //         .RepeatForever()
+    //     )
+    // );
+
 });
 
 builder.Services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);

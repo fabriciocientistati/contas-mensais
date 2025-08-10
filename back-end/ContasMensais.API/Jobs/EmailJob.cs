@@ -24,10 +24,15 @@ public class EmailJob : IJob
         var amanha = hoje.AddDays(1);
 
         Console.WriteLine($"[JOB] Enviando e-mail em: {DateTime.Now}");
-        Console.WriteLine($"[DEBUG] Senha vinda de User Secrets: {_settings.Senha.Substring(0, 4)}...");
+        var senhaDebug = string.IsNullOrEmpty(_settings.Senha) || _settings.Senha.Length < 4
+            ? "(senha não definida ou curta)"
+            : _settings.Senha.Substring(0, 4) + "...";
+        Console.WriteLine($"[DEBUG] Senha vinda de User Secrets: {senhaDebug}");
 
         var contas = await _context.Contas
-            .Where(c => (c.DataVencimento == hoje || c.DataVencimento == amanha) && c.Paga != true)
+            .Where(c => 
+                ((c.DataVencimento < hoje) || (c.DataVencimento == hoje) || (c.DataVencimento == amanha))
+                && c.Paga != true)
             .ToListAsync();
 
         if (!contas.Any())
@@ -38,14 +43,31 @@ public class EmailJob : IJob
 
         foreach (var conta in contas)
         {
-            string quando = conta.DataVencimento == hoje ? "hoje" : "amanhã";
+            string quando;
+            string status;
 
-            var assunto = $"🔔 aviso: conta \"{conta.Nome}\" vence {quando}";
+            if (conta.DataVencimento < hoje)
+            {
+                quando = $"vencida em {conta.DataVencimento:dd/MM/yyyy}";
+                status = "⚠️ AVISO: Conta VENCIDA";
+            }
+            else if (conta.DataVencimento == hoje)
+            {
+                quando = "vence hoje";
+                status = "🔔 aviso: conta vence hoje";
+            }
+            else
+            {
+                quando = $"vence em {conta.DataVencimento:dd/MM/yyyy}";
+                status = "🔔 aviso: conta vence em breve";
+            }
+
+            var assunto = $"{status} - \"{conta.Nome}\"";
             var corpo = $"""
                          Olá, esta é uma notificação automática. 
 
                          A conta **{conta.Nome}** no valor de **R${conta.ValorParcela:F2}**
-                         vence {quando} em **{conta.DataVencimento:dd/MM/yyyy}**.
+                         {quando}.
 
                          Por favor, organize seu pagamento!
 
@@ -68,10 +90,8 @@ public class EmailJob : IJob
                     };
 
                     await smtp.SendMailAsync(mail);
-                    Console.WriteLine($"[OK] E-mail enviado para conta \"{conta.Nome}\" com vencimento {quando}.");
-
+                    Console.WriteLine($"[OK] E-mail enviado para conta \"{conta.Nome}\" ({quando}).");
                 }
-                
             }
             catch (Exception ex)
             {
