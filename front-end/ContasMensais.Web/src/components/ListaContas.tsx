@@ -10,6 +10,7 @@ import { FaTrash, FaCheck, FaUndo, FaEdit } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import GraficoTotais from './GraficoTotais';
+import { addToQueue } from '../utils/offlineQueue';
 
 const ListaContas = () => {
   const [contas, setContas] = useState<Conta[]>([]);
@@ -65,7 +66,18 @@ const ListaContas = () => {
     }
 
     if (!navigator.onLine) {
-      toast.info('Sem conexão. A receita não foi salva.');
+      addToQueue({
+        method: 'PUT',
+        url: '/receitas',
+        data: {
+          ano,
+          mes,
+          valorTotal: valorNumerico
+        }
+      });
+      setReceitaServidor(valorNumerico);
+      setReceitaTotal(valorNumerico.toString());
+      toast.success('Receita salva offline. Será sincronizada ao voltar à internet.');
       return;
     }
 
@@ -103,7 +115,7 @@ const ListaContas = () => {
       });
   }, [ano, mes]);
 
-  useEffect(() => {
+  const carregarReceita = useCallback(() => {
     setCarregandoReceita(true);
     setReceitaServidor(null);
 
@@ -132,16 +144,21 @@ const ListaContas = () => {
   }, [ano, mes]);
 
   useEffect(() => {
+    carregarReceita();
+  }, [carregarReceita]);
+
+  useEffect(() => {
     const listener = () => {
       console.log('🔁 Esperando para recarregar...');
       setTimeout(() => {
         carregar();
+        carregarReceita();
       }, 1000); // aguarda 1 segundo para garantir que a API terminou
     };
 
     window.addEventListener('sincronizacao-finalizada', listener);
     return () => window.removeEventListener('sincronizacao-finalizada', listener);
-  }, [carregar]);
+  }, [carregar, carregarReceita]);
 
   useEffect(() => {
     if (!navigator.onLine) {
