@@ -21,9 +21,12 @@ const ListaContas = () => {
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pagas' | 'nao-pagas'>('todas');
   const [busca, setBusca] = useState('');
   const [receitaTotal, setReceitaTotal] = useState<string>('');
+  const [receitaExtra, setReceitaExtra] = useState<string>('');
   const [receitaServidor, setReceitaServidor] = useState<number | null>(null);
   const [carregandoReceita, setCarregandoReceita] = useState(false);
   const [salvandoReceita, setSalvandoReceita] = useState(false);
+  const [propagarReceita, setPropagarReceita] = useState(false);
+  const mesesPropagar = 12;
 
   const totalMes = contas.length
     ? contas.reduce((total, conta) =>
@@ -44,9 +47,136 @@ const ListaContas = () => {
   const receitaAlterada = receitaValida
     ? (receitaServidor === null || Number(receitaTotal) !== receitaServidor)
     : false;
+  const receitaExtraValida = receitaExtra.trim() !== '' && Number.isFinite(Number(receitaExtra)) && Number(receitaExtra) > 0;
 
   const atualizarReceitaTotal = (valor: string) => {
     setReceitaTotal(valor);
+  };
+
+  const obterMesesFuturos = (anoBase: number, mesBase: number, quantidade: number) => {
+    const meses: { ano: number; mes: number }[] = [];
+    let anoAtual = anoBase;
+    let mesAtual = mesBase;
+
+    for (let i = 0; i < quantidade; i += 1) {
+      mesAtual += 1;
+      if (mesAtual > 12) {
+        mesAtual = 1;
+        anoAtual += 1;
+      }
+      meses.push({ ano: anoAtual, mes: mesAtual });
+    }
+
+    return meses;
+  };
+
+  const salvarReceitaMes = (anoDestino: number, mesDestino: number, valor: number) => {
+    return api.put<ReceitaMensal>('/receitas', {
+      ano: anoDestino,
+      mes: mesDestino,
+      valorTotal: valor
+    });
+  };
+
+  const atualizarReceitaFutura = (valor: number) => {
+    if (!propagarReceita) {
+      return;
+    }
+
+    if (!receitaValida) {
+      return;
+    }
+
+    const valorPropagar = valor < 0 ? 0 : valor;
+    if (valor < 0) {
+      toast.info('Saldo negativo. Propagado como 0 nos próximos meses.');
+    }
+
+    const futuros = obterMesesFuturos(ano, mes, mesesPropagar);
+    if (futuros.length === 0) {
+      return;
+    }
+
+    if (!navigator.onLine) {
+      futuros.forEach((item) => {
+        addToQueue({
+          method: 'PUT',
+          url: '/receitas',
+          data: {
+            ano: item.ano,
+            mes: item.mes,
+            valorTotal: valorPropagar
+          }
+        });
+      });
+      return;
+    }
+
+    Promise.all(futuros.map((item) => salvarReceitaMes(item.ano, item.mes, valorPropagar)))
+      .catch((error) => {
+        console.error('Erro ao atualizar receita nos próximos meses:', error);
+        toast.error('Erro ao atualizar receita nos próximos meses.');
+      });
+  };
+
+  const salvarReceitaComValor = (valorNumerico: number) => {
+    if (!navigator.onLine) {
+      addToQueue({
+        method: 'PUT',
+        url: '/receitas',
+        data: {
+          ano,
+          mes,
+          valorTotal: valorNumerico
+        }
+      });
+
+      if (propagarReceita) {
+        const futuros = obterMesesFuturos(ano, mes, mesesPropagar);
+        futuros.forEach((item) => {
+          addToQueue({
+            method: 'PUT',
+            url: '/receitas',
+            data: {
+              ano: item.ano,
+              mes: item.mes,
+              valorTotal: valorNumerico
+            }
+          });
+        });
+      }
+
+      setReceitaServidor(valorNumerico);
+      setReceitaTotal(valorNumerico.toString());
+      setReceitaExtra('');
+      toast.success('Receita salva offline. Será sincronizada ao voltar à internet.');
+      return;
+    }
+
+    setSalvandoReceita(true);
+    const futuros = propagarReceita ? obterMesesFuturos(ano, mes, mesesPropagar) : [];
+
+    Promise.all([
+      salvarReceitaMes(ano, mes, valorNumerico),
+      ...futuros.map((item) => salvarReceitaMes(item.ano, item.mes, valorNumerico))
+    ])
+      .then(respostas => {
+        const respostaAtual = respostas[0];
+        setReceitaServidor(respostaAtual.data.valorTotal);
+        setReceitaTotal(respostaAtual.data.valorTotal.toString());
+        setReceitaExtra('');
+        toast.success(propagarReceita
+          ? 'Receita atualizada e aplicada aos próximos meses.'
+          : 'Receita atualizada com sucesso.'
+        );
+      })
+      .catch(error => {
+        console.error('Erro ao salvar receita:', error);
+        toast.error('Erro ao salvar receita.');
+      })
+      .finally(() => {
+        setSalvandoReceita(false);
+      });
   };
 
   const salvarReceita = () => {
@@ -65,40 +195,25 @@ const ListaContas = () => {
       return;
     }
 
-    if (!navigator.onLine) {
-      addToQueue({
-        method: 'PUT',
-        url: '/receitas',
-        data: {
-          ano,
-          mes,
-          valorTotal: valorNumerico
-        }
-      });
-      setReceitaServidor(valorNumerico);
-      setReceitaTotal(valorNumerico.toString());
-      toast.success('Receita salva offline. Será sincronizada ao voltar à internet.');
+    salvarReceitaComValor(valorNumerico);
+  };
+
+  const somarReceita = () => {
+    if (!receitaExtra.trim()) {
+      toast.info('Informe um valor para somar.');
       return;
     }
 
-    setSalvandoReceita(true);
-    api.put<ReceitaMensal>('/receitas', {
-      ano,
-      mes,
-      valorTotal: valorNumerico
-    })
-      .then(res => {
-        setReceitaServidor(res.data.valorTotal);
-        setReceitaTotal(res.data.valorTotal.toString());
-        toast.success('Receita atualizada com sucesso.');
-      })
-      .catch(error => {
-        console.error('Erro ao salvar receita:', error);
-        toast.error('Erro ao salvar receita.');
-      })
-      .finally(() => {
-        setSalvandoReceita(false);
-      });
+    const valorExtra = Number(receitaExtra);
+    if (!Number.isFinite(valorExtra) || valorExtra <= 0) {
+      toast.error('Informe um valor válido para somar.');
+      return;
+    }
+
+    const base = receitaServidor ?? 0;
+    const valorFinal = base + valorExtra;
+
+    salvarReceitaComValor(valorFinal);
   };
 
   const carregar = useCallback(() => {
@@ -206,10 +321,17 @@ const ListaContas = () => {
 
   const alternarPagamento = (conta: Conta) => {
     const rota = conta.paga ? 'desmarcar' : 'pagar';
+    const valorConta = (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0);
+    const deltaPago = conta.paga ? -valorConta : valorConta;
+    const saldoAtual = receitaTotalNumerica - totalPago;
+    const saldoNovo = saldoAtual - deltaPago;
+
     api.put(`/contas/${conta.id}/${rota}`).then(() => {
       setContas(prev =>
         prev.map(c => c.id === conta.id ? { ...c, paga: !c.paga } : c)
       );
+
+      atualizarReceitaFutura(saldoNovo);
     });
   };
 
@@ -329,6 +451,38 @@ const ListaContas = () => {
         >
           {salvandoReceita ? 'Salvando...' : 'Salvar receita'}
         </button>
+
+        <div className="resumo-extra">
+          <label htmlFor="receita-extra">Valor extra para somar</label>
+          <input
+            id="receita-extra"
+            type="number"
+            step="0.01"
+            min="0"
+            value={receitaExtra}
+            onChange={(e) => setReceitaExtra(e.target.value)}
+            placeholder="Informe um valor extra..."
+            disabled={carregandoReceita || salvandoReceita}
+          />
+          <button
+            type="button"
+            className="btn-receita secundario"
+            onClick={somarReceita}
+            disabled={carregandoReceita || salvandoReceita || !receitaExtraValida}
+          >
+            {salvandoReceita ? 'Salvando...' : 'Somar receita'}
+          </button>
+        </div>
+
+        <label className="resumo-checkbox">
+          <input
+            type="checkbox"
+            checked={propagarReceita}
+            onChange={(e) => setPropagarReceita(e.target.checked)}
+            disabled={carregandoReceita || salvandoReceita}
+          />
+          Aplicar para os próximos {mesesPropagar} meses
+        </label>
 
         <div className="resumo-grid">
           <div className="resumo-item">

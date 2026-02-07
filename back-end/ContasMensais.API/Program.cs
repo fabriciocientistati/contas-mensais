@@ -349,6 +349,41 @@ app.MapGet("/receitas", async (int ano, int mes, AppDbContext db) =>
         .FirstOrDefaultAsync(r => r.Ano == ano && r.Mes == mes);
 
     if (receita is null)
+    {
+        var (anoAnterior, mesAnterior) = ObterMesAnterior(ano, mes);
+
+        var receitaAnterior = await db.Receitas
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Ano == anoAnterior && r.Mes == mesAnterior);
+
+        if (receitaAnterior is not null)
+        {
+            var totalPagoAnterior = await db.Contas
+                .AsNoTracking()
+                .Where(c => c.Ano == anoAnterior && c.Mes == mesAnterior && c.Paga == true)
+                .Select(c => c.ValorParcela * c.QuantidadeParcelas)
+                .DefaultIfEmpty(0)
+                .SumAsync();
+
+            var saldoAnterior = receitaAnterior.ValorTotal - totalPagoAnterior;
+
+            if (saldoAnterior > 0)
+            {
+                receita = new ReceitaMensal
+                {
+                    Ano = ano,
+                    Mes = mes,
+                    ValorTotal = Math.Round(saldoAnterior, 2),
+                    AtualizadoEm = DateTime.UtcNow
+                };
+
+                db.Receitas.Add(receita);
+                await db.SaveChangesAsync();
+            }
+        }
+    }
+
+    if (receita is null)
         return Results.NotFound();
 
     var dto = new ReceitaMensalDto
@@ -406,6 +441,14 @@ app.MapPut("/receitas", async (
 
     return Results.Ok(resultado);
 });
+
+static (int ano, int mes) ObterMesAnterior(int ano, int mes)
+{
+    if (mes <= 1)
+        return (ano - 1, 12);
+
+    return (ano, mes - 1);
+}
 
 app.MapGet("/contas/pdf", async (
     int? ano, int? mes, string? status, string? nome,

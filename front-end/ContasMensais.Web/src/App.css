@@ -297,6 +297,51 @@ h1 {
   cursor: not-allowed;
 }
 
+.resumo-receita .btn-receita.secundario {
+  background-color: #2563eb;
+}
+
+.resumo-receita .btn-receita.secundario:hover {
+  background-color: #1d4ed8;
+}
+
+.resumo-extra {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resumo-extra label {
+  font-weight: bold;
+  color: #e5e7eb;
+}
+
+.resumo-extra input {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #374151;
+  background-color: #111827;
+  color: #f9fafb;
+  font-size: 1.1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.resumo-checkbox {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 0.95rem;
+  color: #d1d5db;
+}
+
+.resumo-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
 .resumo-label {
   display: block;
   margin-bottom: 8px;
