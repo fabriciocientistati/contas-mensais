@@ -30,27 +30,10 @@ const SincronizadorOffline = () => {
   if (!temPendencias || !navigator.onLine) return null;
 
   return (
-    <div style={{
-      backgroundColor: '#facc15',
-      color: '#000',
-      padding: '12px',
-      textAlign: 'center',
-      position: 'fixed',
-      bottom: 0,
-      width: '100%',
-      zIndex: 1000
-    }}>
-      <strong>Você possui ações offline pendentes.</strong>
-      <button onClick={sincronizar} style={{
-        marginLeft: '10px',
-        background: '#000',
-        color: '#fff',
-        padding: '8px 16px',
-        borderRadius: '4px',
-        border: 'none',
-        cursor: 'pointer'
-      }}>
-        🔄 Sincronizar agora
+    <div className="offline-banner">
+      <span className="offline-banner-text">Voce possui acoes offline pendentes.</span>
+      <button type="button" className="offline-banner-btn" onClick={sincronizar}>
+        Sincronizar agora
       </button>
     </div>
   );

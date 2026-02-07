@@ -156,10 +156,38 @@ app.MapGet("/contas/busca", async (
 
     var resultado = filtradas
         .OrderBy(c => c.Nome)
+        .ThenBy(c => c.DataVencimento)
         .ToList();
 
-    return resultado.Any()
-        ? Results.Ok(resultado)
+    var grupos = contas
+        .GroupBy(c => c.Nome)
+        .ToDictionary(
+            g => g.Key,
+            g => g.OrderBy(c => c.DataVencimento).ToList()
+        );
+
+    var dtos = resultado.Select(c =>
+    {
+        var grupo = grupos[c.Nome];
+        var indice = grupo.FindIndex(p => p.Id == c.Id);
+
+        return new ContaDto
+        {
+            Id = c.Id,
+            Nome = c.Nome,
+            Ano = c.Ano,
+            Mes = c.Mes,
+            Paga = c.Paga,
+            DataVencimento = c.DataVencimento,
+            ValorParcela = c.ValorParcela,
+            QuantidadeParcelas = c.QuantidadeParcelas,
+            IndiceParcela = indice + 1,
+            TotalParcelas = grupo.Count
+        };
+    }).ToList();
+
+    return dtos.Any()
+        ? Results.Ok(dtos)
         : Results.NotFound("Nenhuma conta encontrada com os filtros informados.");
 });
 
