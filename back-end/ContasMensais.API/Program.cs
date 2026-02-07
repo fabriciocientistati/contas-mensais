@@ -95,7 +95,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 app.UseCors("CorsPolicy");
@@ -340,6 +340,115 @@ app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db) =>
 
     return Results.NoContent();
 });
+
+// Receitas
+app.MapGet("/receitas", async (int ano, int mes, AppDbContext db) =>
+{
+    var receita = await db.Receitas
+        .AsNoTracking()
+        .FirstOrDefaultAsync(r => r.Ano == ano && r.Mes == mes);
+
+    if (receita is null)
+    {
+        var (anoAnterior, mesAnterior) = ObterMesAnterior(ano, mes);
+
+        var receitaAnterior = await db.Receitas
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Ano == anoAnterior && r.Mes == mesAnterior);
+
+        if (receitaAnterior is not null)
+        {
+            var totalPagoAnterior = await db.Contas
+                .AsNoTracking()
+                .Where(c => c.Ano == anoAnterior && c.Mes == mesAnterior && c.Paga == true)
+                .Select(c => c.ValorParcela * c.QuantidadeParcelas)
+                .DefaultIfEmpty(0)
+                .SumAsync();
+
+            var saldoAnterior = receitaAnterior.ValorTotal - totalPagoAnterior;
+
+            if (saldoAnterior > 0)
+            {
+                receita = new ReceitaMensal
+                {
+                    Ano = ano,
+                    Mes = mes,
+                    ValorTotal = Math.Round(saldoAnterior, 2),
+                    AtualizadoEm = DateTime.UtcNow
+                };
+
+                db.Receitas.Add(receita);
+                await db.SaveChangesAsync();
+            }
+        }
+    }
+
+    if (receita is null)
+        return Results.NotFound();
+
+    var dto = new ReceitaMensalDto
+    {
+        Id = receita.Id,
+        Ano = receita.Ano,
+        Mes = receita.Mes,
+        ValorTotal = receita.ValorTotal,
+        AtualizadoEm = receita.AtualizadoEm
+    };
+
+    return Results.Ok(dto);
+});
+
+app.MapPut("/receitas", async (
+    [FromBody] ReceitaMensalDto dto,
+    IValidator<ReceitaMensalDto> validator,
+    AppDbContext db) =>
+{
+    var validationResult = await ContasMensais.API.Extensions.ValidationExtensions.Validate(dto, validator);
+
+    if (validationResult is not null)
+        return validationResult;
+
+    var receita = await db.Receitas
+        .FirstOrDefaultAsync(r => r.Ano == dto.Ano && r.Mes == dto.Mes);
+
+    if (receita is null)
+    {
+        receita = new ReceitaMensal
+        {
+            Ano = dto.Ano,
+            Mes = dto.Mes,
+            ValorTotal = dto.ValorTotal,
+            AtualizadoEm = DateTime.UtcNow
+        };
+        db.Receitas.Add(receita);
+    }
+    else
+    {
+        receita.ValorTotal = dto.ValorTotal;
+        receita.AtualizadoEm = DateTime.UtcNow;
+    }
+
+    await db.SaveChangesAsync();
+
+    var resultado = new ReceitaMensalDto
+    {
+        Id = receita.Id,
+        Ano = receita.Ano,
+        Mes = receita.Mes,
+        ValorTotal = receita.ValorTotal,
+        AtualizadoEm = receita.AtualizadoEm
+    };
+
+    return Results.Ok(resultado);
+});
+
+static (int ano, int mes) ObterMesAnterior(int ano, int mes)
+{
+    if (mes <= 1)
+        return (ano - 1, 12);
+
+    return (ano, mes - 1);
+}
 
 app.MapGet("/contas/pdf", async (
     int? ano, int? mes, string? status, string? nome,
