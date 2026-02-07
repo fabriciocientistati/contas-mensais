@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import type { Conta } from '../types/Conta';
 import { handleApiError } from '../utils/handleApiError';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/currency';
 
 interface Props {
   ano: number;
@@ -21,24 +22,33 @@ const dataFormatada = `${anoAtual}-${mesAtual}-${dia}`;
 const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContasSalvas }: Props) => {
   const [nome, setNome] = useState('');
   const [dataVencimento, setDataVencimento] = useState(dataFormatada);
-  const [valorParcela, setValorParcela] = useState('0');
+  const [valorParcela, setValorParcela] = useState('');
   const [quantidadeParcelas, setQuantidadeParcelas] = useState('1');
   const [errors, setErrors] = useState<Record<string, string[]>>({});
-  const valorParcelaNumerico = parseFloat(valorParcela);
+  const valorParcelaNumerico = parseCurrencyInput(valorParcela);
   const quantidadeParcelasNumerico = parseInt(quantidadeParcelas);
+  const parcelasNumero = Number.parseInt(quantidadeParcelas, 10);
+  const parcelasAtual = Number.isFinite(parcelasNumero) ? parcelasNumero : 1;
+  const maxParcelas = 60;
 
   useEffect(() => {
     if (contaParaEditar) {
       setNome(contaParaEditar.nome);
       setDataVencimento(contaParaEditar.dataVencimento.split('T')[0]);
-      setValorParcela(contaParaEditar.valorParcela.toString());
+      setValorParcela(formatCurrency(contaParaEditar.valorParcela));
       setQuantidadeParcelas(contaParaEditar.totalParcelas?.toString() ?? contaParaEditar.quantidadeParcelas.toString());
       setErrors({});
     }
   }, [contaParaEditar]);
 
   const salvar = async () => {
-  if (isNaN(valorParcelaNumerico) || isNaN(quantidadeParcelasNumerico)) {
+  if (
+    !valorParcela.trim()
+    || !Number.isFinite(valorParcelaNumerico)
+    || valorParcelaNumerico <= 0
+    || !Number.isFinite(quantidadeParcelasNumerico)
+    || quantidadeParcelasNumerico < 1
+  ) {
     toast.error('Valor da parcela e quantidade de parcelas devem ser números válidos.');
     return;
   }
@@ -92,70 +102,106 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContasSalvas }: Prop
     setErrors({});
   };
 
+  const atualizarParcelas = (valor: string) => {
+    setQuantidadeParcelas(valor);
+    setErrors(prev => ({ ...prev, QuantidadeParcelas: [] }));
+  };
+
   return (
     <div className='formulario'>
-      <input
-        type='text'
-        placeholder='Digite o nome da conta...'
-        value={nome}
-        onChange={e => {
-          setNome(e.target.value);
-          setErrors(prev => ({ ...prev, Nome: [] }));
-        }}
-        style={{ borderColor: errors.Nome ? 'red' : undefined }}
-      />
-      {errors.Nome?.map((msg, i) => (
-        <small key={i} style={{ color: 'red' }}>{msg}</small>
-      ))}
+      <div className="campo">
+        <label htmlFor="conta-nome">Nome da conta</label>
+        <input
+          id="conta-nome"
+          className="campo-input"
+          type='text'
+          placeholder='Ex.: Energia, Internet...'
+          value={nome}
+          onChange={e => {
+            setNome(e.target.value);
+            setErrors(prev => ({ ...prev, Nome: [] }));
+          }}
+          style={{ borderColor: errors.Nome ? 'var(--danger)' : undefined }}
+          aria-invalid={Boolean(errors.Nome?.length)}
+        />
+        {errors.Nome?.map((msg, i) => (
+          <small key={i} className="campo-erro">{msg}</small>
+        ))}
+        <small className="campo-ajuda">Ex.: Energia, Internet, Cartao.</small>
+      </div>
 
-      <input
-        type='date'
-        value={dataVencimento}
-        onChange={e => {
-          setDataVencimento(e.target.value);
-          setErrors(prev => ({ ...prev, DataVencimento: [] }));
-        }}
-        style={{ borderColor: errors.DataVencimento ? 'red' : undefined }}
-      />
-      {errors.DataVencimento?.map((msg, i) => (
-        <small key={i} style={{ color: 'red' }}>{msg}</small>
-      ))}
+      <div className="campo">
+        <label htmlFor="conta-vencimento">Vencimento</label>
+        <input
+          id="conta-vencimento"
+          className="campo-input"
+          type='date'
+          value={dataVencimento}
+          onChange={e => {
+            setDataVencimento(e.target.value);
+            setErrors(prev => ({ ...prev, DataVencimento: [] }));
+          }}
+          style={{ borderColor: errors.DataVencimento ? 'var(--danger)' : undefined }}
+          aria-invalid={Boolean(errors.DataVencimento?.length)}
+        />
+        {errors.DataVencimento?.map((msg, i) => (
+          <small key={i} className="campo-erro">{msg}</small>
+        ))}
+        <small className="campo-ajuda">Data de vencimento da parcela.</small>
+      </div>
 
-      <input
-        type='number'
-        placeholder='Digite o valor da parcela...'
-        value={valorParcela}
-        onChange={e => {
-          setValorParcela(e.target.value);
-          setErrors(prev => ({ ...prev, ValorParcela: [] }));
-        }}
-        step='0.01'
-        style={{ borderColor: errors.ValorParcela ? 'red' : undefined }}
-      />
-      {errors.ValorParcela?.map((msg, i) => (
-        <small key={i} style={{ color: 'red' }}>{msg}</small>
-      ))}
+      <div className="campos-linha">
+        <div className="campo">
+          <label htmlFor="conta-valor">Valor da parcela</label>
+          <input
+            id="conta-valor"
+            className="campo-input"
+            type='text'
+            placeholder='R$ 0,00'
+            value={valorParcela}
+            onChange={e => {
+              setValorParcela(formatCurrencyInput(e.target.value));
+              setErrors(prev => ({ ...prev, ValorParcela: [] }));
+            }}
+            inputMode='decimal'
+            style={{ borderColor: errors.ValorParcela ? 'var(--danger)' : undefined }}
+            aria-invalid={Boolean(errors.ValorParcela?.length)}
+          />
+          {errors.ValorParcela?.map((msg, i) => (
+            <small key={i} className="campo-erro">{msg}</small>
+          ))}
+          <small className="campo-ajuda">Valor de cada parcela.</small>
+        </div>
 
-      <input
-        type='number'
-        placeholder='Digite a quantidade de parcelas...'
-        value={quantidadeParcelas}
-        onChange={e => {
-          setQuantidadeParcelas(e.target.value);
-          setErrors(prev => ({ ...prev, QuantidadeParcelas: [] }));
-        }}
-        style={{ borderColor: errors.QuantidadeParcelas ? 'red' : undefined }}
-      />
-      {errors.QuantidadeParcelas?.map((msg, i) => (
-        <small key={i} style={{ color: 'red' }}>{msg}</small>
-      ))}
+        <div className="campo">
+          <label htmlFor="conta-parcelas">Quantidade de parcelas</label>
+          <div className="slider-wrap">
+            <input
+              id="conta-parcelas"
+              className="slider"
+              type="range"
+              min="1"
+              max={maxParcelas}
+              step="1"
+              value={parcelasAtual}
+              onChange={e => atualizarParcelas(e.target.value)}
+              aria-invalid={Boolean(errors.QuantidadeParcelas?.length)}
+            />
+            <div className="slider-value">{parcelasAtual}x</div>
+          </div>
+          {errors.QuantidadeParcelas?.map((msg, i) => (
+            <small key={i} className="campo-erro">{msg}</small>
+          ))}
+          <small className="campo-ajuda">Arraste para escolher. 1 = a vista.</small>
+        </div>
+      </div>
 
       <button onClick={salvar}>
-        {contaParaEditar ? 'Salvar alterações' : 'Salvar'}
+        {contaParaEditar ? 'Salvar alteracoes' : 'Salvar'}
       </button>
-      
     </div>
   );
 };
 
 export default FormularioNovaConta;
+

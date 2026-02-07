@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import api from '../services/api';
@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import GraficoTotais from './GraficoTotais';
 import { addToQueue } from '../utils/offlineQueue';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/currency';
 
 const ListaContas = () => {
   const [contas, setContas] = useState<Conta[]>([]);
@@ -26,6 +27,15 @@ const ListaContas = () => {
   const [carregandoReceita, setCarregandoReceita] = useState(false);
   const [salvandoReceita, setSalvandoReceita] = useState(false);
   const [propagarReceita, setPropagarReceita] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+  const [buscaSemResultado, setBuscaSemResultado] = useState(false);
+  const [modalContaAberto, setModalContaAberto] = useState(false);
+  const [modalReceitaAberta, setModalReceitaAberta] = useState(false);
+  const [modalContaFechando, setModalContaFechando] = useState(false);
+  const [modalReceitaFechando, setModalReceitaFechando] = useState(false);
+  const [formKey, setFormKey] = useState(0);
+  const timeoutFecharConta = useRef<number | null>(null);
+  const timeoutFecharReceita = useRef<number | null>(null);
   const mesesPropagar = 12;
   const chavePropagarReceita = 'propagar-receita';
 
@@ -42,13 +52,72 @@ const ListaContas = () => {
     : 0;
 
   const totalPendente = Math.max(totalMes - totalPago, 0);
-  const receitaTotalNumerica = Number.isFinite(Number(receitaTotal)) ? Number(receitaTotal) : 0;
+  const receitaTotalNumerica = parseCurrencyInput(receitaTotal);
+  const receitaExtraNumerica = parseCurrencyInput(receitaExtra);
   const saldoReceita = receitaTotalNumerica - totalPago;
-  const receitaValida = receitaTotal.trim() !== '' && Number.isFinite(Number(receitaTotal));
+  const receitaValida = receitaTotal.trim() !== '';
   const receitaAlterada = receitaValida
-    ? (receitaServidor === null || Number(receitaTotal) !== receitaServidor)
+    ? (receitaServidor === null || receitaTotalNumerica !== receitaServidor)
     : false;
-  const receitaExtraValida = receitaExtra.trim() !== '' && Number.isFinite(Number(receitaExtra)) && Number(receitaExtra) > 0;
+  const receitaExtraValida = receitaExtra.trim() !== '' && receitaExtraNumerica > 0;
+  const filtrosDisponiveis = [
+    { value: 'todas', label: 'Todas' },
+    { value: 'pagas', label: 'Pagas' },
+    { value: 'nao-pagas', label: 'Em aberto' },
+  ] as const;
+  const buscaAtiva = busca.trim().length > 0;
+
+  const abrirModalConta = (conta?: Conta | null) => {
+    if (timeoutFecharConta.current) {
+      window.clearTimeout(timeoutFecharConta.current);
+      timeoutFecharConta.current = null;
+    }
+    setModalContaFechando(false);
+    setContaEditando(conta ?? null);
+    setFormKey(prev => prev + 1);
+    setModalContaAberto(true);
+  };
+
+  const fecharModalConta = () => {
+    if (!modalContaAberto || modalContaFechando) return;
+    setModalContaFechando(true);
+    timeoutFecharConta.current = window.setTimeout(() => {
+      setModalContaAberto(false);
+      setContaEditando(null);
+      setFormKey(prev => prev + 1);
+      setModalContaFechando(false);
+      timeoutFecharConta.current = null;
+    }, 200);
+  };
+
+  const abrirModalReceita = () => {
+    if (timeoutFecharReceita.current) {
+      window.clearTimeout(timeoutFecharReceita.current);
+      timeoutFecharReceita.current = null;
+    }
+    setModalReceitaFechando(false);
+    setModalReceitaAberta(true);
+  };
+  const fecharModalReceita = () => {
+    if (!modalReceitaAberta || modalReceitaFechando) return;
+    setModalReceitaFechando(true);
+    timeoutFecharReceita.current = window.setTimeout(() => {
+      setModalReceitaAberta(false);
+      setModalReceitaFechando(false);
+      timeoutFecharReceita.current = null;
+    }, 200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutFecharConta.current) {
+        window.clearTimeout(timeoutFecharConta.current);
+      }
+      if (timeoutFecharReceita.current) {
+        window.clearTimeout(timeoutFecharReceita.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const salvo = localStorage.getItem(chavePropagarReceita);
@@ -58,7 +127,7 @@ const ListaContas = () => {
   }, []);
 
   const atualizarReceitaTotal = (valor: string) => {
-    setReceitaTotal(valor);
+    setReceitaTotal(formatCurrencyInput(valor));
   };
 
   const atualizarPropagacao = (valor: boolean) => {
@@ -155,7 +224,7 @@ const ListaContas = () => {
       }
 
       setReceitaServidor(valorNumerico);
-      setReceitaTotal(valorNumerico.toString());
+      setReceitaTotal(formatCurrency(valorNumerico));
       setReceitaExtra('');
       toast.success('Receita salva offline. Será sincronizada ao voltar à internet.');
       return;
@@ -171,7 +240,7 @@ const ListaContas = () => {
       .then(respostas => {
         const respostaAtual = respostas[0];
         setReceitaServidor(respostaAtual.data.valorTotal);
-        setReceitaTotal(respostaAtual.data.valorTotal.toString());
+        setReceitaTotal(formatCurrency(respostaAtual.data.valorTotal));
         setReceitaExtra('');
         toast.success(propagarReceita
           ? 'Receita atualizada e aplicada aos próximos meses.'
@@ -193,7 +262,7 @@ const ListaContas = () => {
       return;
     }
 
-    const valorNumerico = Number(receitaTotal);
+    const valorNumerico = parseCurrencyInput(receitaTotal);
     if (!Number.isFinite(valorNumerico)) {
       toast.error('Informe um valor de receita válido.');
       return;
@@ -212,7 +281,7 @@ const ListaContas = () => {
       return;
     }
 
-    const valorExtra = Number(receitaExtra);
+    const valorExtra = receitaExtraNumerica;
     if (!Number.isFinite(valorExtra) || valorExtra <= 0) {
       toast.error('Informe um valor válido para somar.');
       return;
@@ -251,7 +320,7 @@ const ListaContas = () => {
     api.get<ReceitaMensal>(`/receitas?ano=${ano}&mes=${mes}`)
       .then(res => {
         setReceitaServidor(res.data.valorTotal);
-        setReceitaTotal(res.data.valorTotal.toString());
+        setReceitaTotal(formatCurrency(res.data.valorTotal));
       })
       .catch(error => {
         if (error?.response?.status === 404) {
@@ -297,29 +366,65 @@ const ListaContas = () => {
   }, [ano, mes, carregar]);
 
   useEffect(() => {
+    if (!busca.trim()) {
+      setBuscaSemResultado(false);
+      if (!navigator.onLine) {
+        const cacheKey = `contas-cache-${ano}-${mes}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          setContas(JSON.parse(cached));
+          console.log("📦 Carregado do cache offline:", cacheKey);
+        }
+        return;
+      }
+      carregar();
+      return;
+    }
+
+    const buscarLocal = (dados: Conta[]) => {
+      const termo = busca.trim().toLowerCase();
+      const resultado = dados.filter(c =>
+        c.nome?.toLowerCase().includes(termo)
+      );
+      setContas(resultado);
+      setBuscaSemResultado(resultado.length === 0);
+      setBuscando(false);
+    };
+
+    setBuscando(true);
+    setBuscaSemResultado(false);
+
     if (!navigator.onLine) {
       const cacheKey = `contas-cache-${ano}-${mes}`;
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
-        setContas(JSON.parse(cached));
-        console.log("📦 Carregado do cache offline:", cacheKey);
+        buscarLocal(JSON.parse(cached));
+      } else {
+        setContas([]);
+        setBuscaSemResultado(true);
+        setBuscando(false);
       }
-      return;
-    }
-    if (!busca.trim()) {
-      carregar();
       return;
     }
 
     const delayDebounce = setTimeout(() => {
       api.get<Conta[]>(`/contas/busca?valor=${encodeURIComponent(busca)}&ano=${ano}&mes=${mes}`)
         .then(res => {
-          setContas(res.data);
+          const dados = Array.isArray(res.data) ? res.data : [];
+          setContas(dados);
+          setBuscaSemResultado(dados.length === 0);
         })
         .catch(err => {
-          toast.error('Nenhuma conta encontrada.');
-          setContas([]);
+          if (err?.response?.status === 404) {
+            setContas([]);
+            setBuscaSemResultado(true);
+            return;
+          }
           console.error('Erro ao buscar contas:', err);
+          toast.error('Erro ao buscar contas.');
+        })
+        .finally(() => {
+          setBuscando(false);
         });
 
     }, 500);
@@ -409,239 +514,334 @@ const ListaContas = () => {
     return !conta.paga && dayjs(conta.dataVencimento).isBefore(dayjs(), 'day');
   };
 
+  const contasFiltradas = contas.filter(conta => {
+    if (filtroStatus === 'pagas') return conta.paga === true;
+    if (filtroStatus === 'nao-pagas') return conta.paga === false;
+    return true;
+  });
+
+  const limparBusca = () => {
+    setBusca('');
+    setBuscaSemResultado(false);
+  };
+
   return (
     <div>
-      <SeletorMesAno ano={ano} mes={mes} onChange={(a, m) => { setAno(a); setMes(m); }} />
+      <div className="topo-sticky">
+        <SeletorMesAno ano={ano} mes={mes} onChange={(a, m) => { setAno(a); setMes(m); }} />
+      </div>
 
-      <FormularioNovaConta
-        ano={ano}
-        mes={mes}
-        contaParaEditar={contaEditando}
-        onContasSalvas={(contasCriadas) => {
-          setContaEditando(null);
-          setAtualizacaoGrafico(prev => prev + 1);
-
-          // ✅ Recarrega o mês atual para refletir alterações corretamente
-          carregar();
-
-          const contasDoMesAtual = contasCriadas.filter(c => c.ano === ano && c.mes === mes);
-
-          setContas(prev => {
-            const idsCriadas = contasCriadas.map(c => c.id);
-            const semEditadas = prev.filter(c => !idsCriadas.includes(c.id));
-            return [...contasDoMesAtual, ...semEditadas];
-          });
-
-          setAtualizacaoGrafico(prev => prev + 1);
-        }}
-      />
+      <div className="acao-rapida">
+        <button type="button" className="btn-acao" onClick={() => abrirModalConta()}>
+          Nova conta
+        </button>
+      </div>
 
       <div className="resumo-receita">
-        <h2>Receita e Descontos</h2>
-        <label htmlFor="receita-total" className="resumo-label">
-          Receita total do mes
-        </label>
-        <input
-          id="receita-total"
-          type="number"
-          step="0.01"
-          min="0"
-          value={receitaTotal}
-          onChange={(e) => atualizarReceitaTotal(e.target.value)}
-          placeholder="Informe a receita total do mes..."
-          disabled={carregandoReceita}
-        />
-        <button
-          type="button"
-          className="btn-receita"
-          onClick={salvarReceita}
-          disabled={carregandoReceita || salvandoReceita || !receitaAlterada}
-        >
-          {salvandoReceita ? 'Salvando...' : 'Salvar receita'}
-        </button>
-
-        <div className="resumo-extra">
-          <label htmlFor="receita-extra">Valor extra para somar</label>
-          <input
-            id="receita-extra"
-            type="number"
-            step="0.01"
-            min="0"
-            value={receitaExtra}
-            onChange={(e) => setReceitaExtra(e.target.value)}
-            placeholder="Informe um valor extra..."
-            disabled={carregandoReceita || salvandoReceita}
-          />
-          <button
-            type="button"
-            className="btn-receita secundario"
-            onClick={somarReceita}
-            disabled={carregandoReceita || salvandoReceita || !receitaExtraValida}
-          >
-            {salvandoReceita ? 'Salvando...' : 'Somar receita'}
+        <div className="resumo-header">
+          <h2>Receita e Descontos</h2>
+          <button type="button" className="btn-outline" onClick={abrirModalReceita}>
+            {receitaServidor === null ? 'Adicionar receita' : 'Editar receita'}
           </button>
         </div>
-
-        <label className="resumo-checkbox">
-          <input
-            type="checkbox"
-            checked={propagarReceita}
-            onChange={(e) => atualizarPropagacao(e.target.checked)}
-            disabled={carregandoReceita || salvandoReceita}
-          />
-          Aplicar para os próximos {mesesPropagar} meses
-        </label>
 
         <div className="resumo-grid">
           <div className="resumo-item">
             <span className="resumo-item-label">Receita total</span>
             <strong className="resumo-item-valor">
-              {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format(receitaTotalNumerica)}
+              {formatCurrency(receitaTotalNumerica)}
             </strong>
           </div>
           <div className="resumo-item">
             <span className="resumo-item-label">Total descontado (pagas)</span>
             <strong className="resumo-item-valor">
-              {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format(totalPago)}
+              {formatCurrency(totalPago)}
             </strong>
           </div>
           <div className="resumo-item">
             <span className="resumo-item-label">Saldo da receita</span>
             <strong className={`resumo-item-valor ${saldoReceita < 0 ? 'saldo-negativo' : 'saldo-positivo'}`}>
-              {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format(saldoReceita)}
+              {formatCurrency(saldoReceita)}
             </strong>
           </div>
           <div className="resumo-item">
             <span className="resumo-item-label">Total pendente</span>
             <strong className="resumo-item-valor">
-              {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format(totalPendente)}
+              {formatCurrency(totalPendente)}
             </strong>
           </div>
         </div>
       </div>
 
-    <div className="botoes-relatorio">
-      <button onClick={gerarPdfFiltrado}>📄 Gerar PDF filtrado</button>
-      <button onClick={gerarPdfCompleto}>📄 Gerar PDF completo</button>
-    </div>
-
-
-      <div style={{ margin: '10px 0' }}>
-        <input
-          type="text"
-          placeholder="Buscar contas pelo nome..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          style={{
-            padding: '10px',
-            width: '100%',
-            fontSize: '16px',
-            boxSizing: 'border-box'
-          }}
-        />
+      <div className="botoes-relatorio">
+        <button onClick={gerarPdfFiltrado}>Gerar PDF filtrado</button>
+        <button onClick={gerarPdfCompleto}>Gerar PDF completo</button>
       </div>
 
-      <div style={{ margin: '10px 0' }}>
-        <label htmlFor="filtro" style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
-          Filtrar por:
-        </label>
-        <select
-          id="filtro"
-          value={filtroStatus}
-          onChange={e => setFiltroStatus(e.target.value as 'todas' | 'pagas' | 'nao-pagas')}
-          style={{
-            padding: '10px',
-            width: '100%',
-            fontSize: '16px',
-            boxSizing: 'border-box'
-          }}
-        >
-          <option value="todas">Todas</option>
-          <option value="pagas">Pagas</option>
-          <option value="nao-pagas">Não pagas</option>
-        </select>
-      </div>
-
-      <ul className="lista">
-        {contas
-          .filter(conta => {
-            if (filtroStatus === 'pagas') return conta.paga === true;
-            if (filtroStatus === 'nao-pagas') return conta.paga === false;
-            return true;
-          })
-          .map(conta => (
-            <motion.li
-              key={conta.id}
-              className={
-                conta.paga
-                  ? 'paga'
-                  : isVencida(conta)
-                    ? 'vencida'
-                    : 'nao-paga'
-              }
+      <div className="busca-container">
+        <div className="busca-input">
+          <span className="busca-icon" aria-hidden="true"></span>
+          <input
+            type="search"
+            className="campo-busca"
+            placeholder="Buscar contas pelo nome..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            autoComplete="off"
+          />
+          {buscaAtiva && (
+            <button
+              type="button"
+              className="busca-limpar"
+              onClick={limparBusca}
+              aria-label="Limpar busca"
             >
-              <span className='nome-conta'>
-                {busca.trim()
-                  ? conta.nome.split(new RegExp(`(${busca})`, 'gi')).map((parte, i) =>
-                      parte.toLowerCase() === busca.toLowerCase() ? (
-                        <mark key={i} style={{ backgroundColor: 'yellow' }}>{parte}</mark>
-                      ) : (
-                        <span key={i}>{parte}</span>
-                      )
-                    )
-                  : conta.nome}
-              </span>
-              <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
-              <span>Parcela: {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format(conta.valorParcela)}</span>
-              <span>Qtd: <small style={{ color: '#666' }}>({conta.indiceParcela}/{conta.totalParcelas})</small></span>
-              <span>Total: {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              }).format((conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 1))}</span>
-              <div>
-                <button
-                  className={conta.paga ? 'desmarcar' : 'pagar'}
-                  onClick={() => alternarPagamento(conta)}
-                >
-                  {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
-                </button>
+              ×
+            </button>
+          )}
+        </div>
+        <div className="busca-info">
+          {buscando && <span className="busca-status">Buscando...</span>}
+          {!buscando && buscaAtiva && (
+            <span className="busca-status">
+              {buscaSemResultado ? 'Nenhuma conta encontrada.' : `${contasFiltradas.length} resultado(s)`}
+            </span>
+          )}
+        </div>
+      </div>
 
-                <button className='editar' onClick={() => {
-                  setContaEditando(conta);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}>
-                  <FaEdit /> Editar
-                </button>
-
-                <button className="remover" onClick={() => remover(conta.id)}>
-                  <FaTrash /> Remover
-                </button>
-
-              </div>
-            </motion.li>
+      <div className="filtro-container">
+        <span className="filtro-titulo">Filtrar por</span>
+        <div className="filtro-chips" role="group" aria-label="Filtrar contas">
+          {filtrosDisponiveis.map(filtro => (
+            <button
+              key={filtro.value}
+              type="button"
+              className={`chip ${filtroStatus === filtro.value ? 'ativa' : ''}`}
+              onClick={() => setFiltroStatus(filtro.value)}
+              aria-pressed={filtroStatus === filtro.value}
+            >
+              {filtro.label}
+            </button>
           ))}
+        </div>
+      </div>
+
+      {modalContaAberto && (
+        <div
+          className={`modal-overlay ${modalContaFechando ? 'closing' : ''}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={fecharModalConta}
+        >
+          <div className={`modal ${modalContaFechando ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">{contaEditando ? 'Editar conta' : 'Nova conta'}</h3>
+              <button type="button" className="modal-close" onClick={fecharModalConta}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <FormularioNovaConta
+                key={formKey}
+                ano={ano}
+                mes={mes}
+                contaParaEditar={contaEditando}
+                onContasSalvas={(contasCriadas) => {
+                  setContaEditando(null);
+                  setAtualizacaoGrafico(prev => prev + 1);
+
+                  // ✅ Recarrega o mês atual para refletir alterações corretamente
+                  carregar();
+
+                  const contasDoMesAtual = contasCriadas.filter(c => c.ano === ano && c.mes === mes);
+
+                  setContas(prev => {
+                    const idsCriadas = contasCriadas.map(c => c.id);
+                    const semEditadas = prev.filter(c => !idsCriadas.includes(c.id));
+                    return [...contasDoMesAtual, ...semEditadas];
+                  });
+
+                  setAtualizacaoGrafico(prev => prev + 1);
+                  fecharModalConta();
+                }}
+              />
+              <div className="modal-footer">
+                <button type="button" className="btn-outline" onClick={fecharModalConta}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalReceitaAberta && (
+        <div
+          className={`modal-overlay ${modalReceitaFechando ? 'closing' : ''}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={fecharModalReceita}
+        >
+          <div className={`modal ${modalReceitaFechando ? 'closing' : ''}`} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Receita do mês</h3>
+              <button type="button" className="modal-close" onClick={fecharModalReceita}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="resumo-receita receita-modal">
+              <label htmlFor="receita-total" className="resumo-label">
+                Receita total do mes
+              </label>
+              <input
+                id="receita-total"
+                type="text"
+                inputMode="decimal"
+                value={receitaTotal}
+                onChange={(e) => atualizarReceitaTotal(e.target.value)}
+                placeholder="R$ 0,00"
+                disabled={carregandoReceita}
+              />
+                <button
+                  type="button"
+                  className="btn-receita"
+                  onClick={salvarReceita}
+                  disabled={carregandoReceita || salvandoReceita || !receitaAlterada}
+                >
+                  {salvandoReceita ? 'Salvando...' : 'Salvar receita'}
+                </button>
+
+                <div className="resumo-extra">
+                <label htmlFor="receita-extra">Valor extra para somar</label>
+                <input
+                  id="receita-extra"
+                  type="text"
+                  inputMode="decimal"
+                  value={receitaExtra}
+                  onChange={(e) => setReceitaExtra(formatCurrencyInput(e.target.value))}
+                  placeholder="R$ 0,00"
+                  disabled={carregandoReceita || salvandoReceita}
+                />
+                  <button
+                    type="button"
+                    className="btn-receita secundario"
+                    onClick={somarReceita}
+                    disabled={carregandoReceita || salvandoReceita || !receitaExtraValida}
+                  >
+                    {salvandoReceita ? 'Salvando...' : 'Somar receita'}
+                  </button>
+                </div>
+
+                <label className="resumo-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={propagarReceita}
+                    onChange={(e) => atualizarPropagacao(e.target.checked)}
+                    disabled={carregandoReceita || salvandoReceita}
+                  />
+                  Aplicar para os próximos {mesesPropagar} meses
+                </label>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-outline" onClick={fecharModalReceita}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <ul className="lista">
+        {contasFiltradas.map(conta => {
+            const vencida = isVencida(conta);
+            const statusClasse = conta.paga ? 'paga' : vencida ? 'vencida' : 'nao-paga';
+            const statusLabel = conta.paga ? 'Paga' : vencida ? 'Vencida' : 'Em aberto';
+            const totalParcelas = (conta.totalParcelas && conta.totalParcelas > 0)
+              ? conta.totalParcelas
+              : (conta.quantidadeParcelas ?? 1);
+            const indiceParcela = (conta.indiceParcela && conta.indiceParcela > 0)
+              ? conta.indiceParcela
+              : 1;
+            const totalConta = (conta.valorParcela ?? 0) * totalParcelas;
+            const calculoDetalhado = `${formatCurrency(conta.valorParcela ?? 0)} x ${totalParcelas} = ${formatCurrency(totalConta)}`;
+            const mostrarQtd = totalParcelas > 1;
+
+            return (
+              <motion.li
+                key={conta.id}
+                className={statusClasse}
+              >
+                <div className="conta-topo">
+                  <span className='nome-conta'>
+                    {busca.trim()
+                      ? conta.nome.split(new RegExp(`(${busca})`, 'gi')).map((parte, i) =>
+                          parte.toLowerCase() === busca.toLowerCase() ? (
+                            <mark key={i} style={{ backgroundColor: 'yellow' }}>{parte}</mark>
+                          ) : (
+                            <span key={i}>{parte}</span>
+                          )
+                        )
+                      : conta.nome}
+                  </span>
+                  <span className={`status-pill ${statusClasse}`}>{statusLabel}</span>
+                </div>
+                <div className="conta-detalhes">
+                  <span>Venc.: {dayjs(conta.dataVencimento).format('DD/MM/YYYY')}</span>
+                  <span>Parcela: {formatCurrency(conta.valorParcela ?? 0)}</span>
+                  {mostrarQtd && (
+                    <span>Qtd: <small>({indiceParcela}/{totalParcelas})</small></span>
+                  )}
+                  <span className="conta-total">
+                    {mostrarQtd ? 'Total do contrato' : 'Total'}: {formatCurrency(totalConta)}
+                    {mostrarQtd && (
+                      <span
+                        className="info-tooltip"
+                        title={calculoDetalhado}
+                        aria-label={`Calculo: ${calculoDetalhado}`}
+                      >
+                        i
+                      </span>
+                    )}
+                  </span>
+                  {mostrarQtd && (
+                    <span className="info-tooltip-detail">
+                      {calculoDetalhado}
+                    </span>
+                  )}
+                </div>
+                <div className="conta-acoes">
+                  <button
+                    className={conta.paga ? 'desmarcar' : 'pagar'}
+                    onClick={() => alternarPagamento(conta)}
+                  >
+                    {conta.paga ? <><FaUndo /> Desmarcar</> : <><FaCheck /> Pagar</>}
+                  </button>
+
+                  <button className='editar' onClick={() => abrirModalConta(conta)}>
+                    <FaEdit /> Editar
+                  </button>
+
+                  <button className="remover" onClick={() => remover(conta.id)}>
+                    <FaTrash /> Remover
+                  </button>
+
+                </div>
+              </motion.li>
+            );
+          })}
       </ul>
 
+      {contasFiltradas.length === 0 && !buscando && (
+        <div className="estado-vazio">
+          {buscaAtiva ? 'Nenhuma conta encontrada para esta busca.' : 'Nenhuma conta encontrada para este mes.'}
+        </div>
+      )}
+
       <div className="total-mes">
-        Total do mês: {new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL',
-        }).format(totalMes)}
+        Total do mes: {formatCurrency(totalMes)}
       </div>
 
       <GraficoTotais ano={ano} atualizar={atualizacaoGrafico} />
@@ -651,3 +851,5 @@ const ListaContas = () => {
 };
 
 export default ListaContas;
+
+
