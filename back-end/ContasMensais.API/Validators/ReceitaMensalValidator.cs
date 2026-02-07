@@ -15,8 +15,5 @@ public class ReceitaMensalValidator : AbstractValidator<ReceitaMensalDto>
             .InclusiveBetween(1, 12)
             .WithMessage("Mês deve estar entre 1 e 12.");
 
-        RuleFor(r => r.ValorTotal)
-            .GreaterThanOrEqualTo(0)
-            .WithMessage("O valor da receita deve ser maior ou igual a 0.");
     }
 }

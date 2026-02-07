@@ -27,6 +27,7 @@ const ListaContas = () => {
   const [salvandoReceita, setSalvandoReceita] = useState(false);
   const [propagarReceita, setPropagarReceita] = useState(false);
   const mesesPropagar = 12;
+  const chavePropagarReceita = 'propagar-receita';
 
   const totalMes = contas.length
     ? contas.reduce((total, conta) =>
@@ -49,8 +50,20 @@ const ListaContas = () => {
     : false;
   const receitaExtraValida = receitaExtra.trim() !== '' && Number.isFinite(Number(receitaExtra)) && Number(receitaExtra) > 0;
 
+  useEffect(() => {
+    const salvo = localStorage.getItem(chavePropagarReceita);
+    if (salvo !== null) {
+      setPropagarReceita(salvo === 'true');
+    }
+  }, []);
+
   const atualizarReceitaTotal = (valor: string) => {
     setReceitaTotal(valor);
+  };
+
+  const atualizarPropagacao = (valor: boolean) => {
+    setPropagarReceita(valor);
+    localStorage.setItem(chavePropagarReceita, String(valor));
   };
 
   const obterMesesFuturos = (anoBase: number, mesBase: number, quantidade: number) => {
@@ -87,11 +100,6 @@ const ListaContas = () => {
       return;
     }
 
-    const valorPropagar = valor < 0 ? 0 : valor;
-    if (valor < 0) {
-      toast.info('Saldo negativo. Propagado como 0 nos próximos meses.');
-    }
-
     const futuros = obterMesesFuturos(ano, mes, mesesPropagar);
     if (futuros.length === 0) {
       return;
@@ -105,14 +113,14 @@ const ListaContas = () => {
           data: {
             ano: item.ano,
             mes: item.mes,
-            valorTotal: valorPropagar
+            valorTotal: valor
           }
         });
       });
       return;
     }
 
-    Promise.all(futuros.map((item) => salvarReceitaMes(item.ano, item.mes, valorPropagar)))
+    Promise.all(futuros.map((item) => salvarReceitaMes(item.ano, item.mes, valor)))
       .catch((error) => {
         console.error('Erro ao atualizar receita nos próximos meses:', error);
         toast.error('Erro ao atualizar receita nos próximos meses.');
@@ -478,7 +486,7 @@ const ListaContas = () => {
           <input
             type="checkbox"
             checked={propagarReceita}
-            onChange={(e) => setPropagarReceita(e.target.checked)}
+            onChange={(e) => atualizarPropagacao(e.target.checked)}
             disabled={carregandoReceita || salvandoReceita}
           />
           Aplicar para os próximos {mesesPropagar} meses
