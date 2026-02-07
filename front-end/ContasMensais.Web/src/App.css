@@ -248,4 +248,78 @@ h1 {
   background-color: #303f9f;
 }
 
+.resumo-receita {
+  margin-bottom: 20px;
+  background-color: #1f2937;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  color: #f9fafb;
+}
+
+.resumo-receita h2 {
+  text-align: center;
+  margin: 0 0 12px;
+  color: #e5e7eb;
+}
+
+.resumo-receita input {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #374151;
+  background-color: #111827;
+  color: #f9fafb;
+  font-size: 1.1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.resumo-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #e5e7eb;
+}
+
+.resumo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.resumo-item {
+  background-color: #111827;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.resumo-item-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.resumo-item-valor {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.saldo-positivo {
+  color: #10b981;
+}
+
+.saldo-negativo {
+  color: #ef4444;
+}
+
+@media (max-width: 640px) {
+  .resumo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 

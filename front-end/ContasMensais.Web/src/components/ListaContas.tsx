@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import api from '../services/api';
@@ -18,25 +18,41 @@ const ListaContas = () => {
   const [contaEditando, setContaEditando] = useState<Conta | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pagas' | 'nao-pagas'>('todas');
   const [busca, setBusca] = useState('');
+  const [receitaTotal, setReceitaTotal] = useState<string>('');
+
+  useEffect(() => {
+    const chave = `receita-total-${ano}-${mes}`;
+    const salva = localStorage.getItem(chave);
+    setReceitaTotal(salva ?? '');
+  }, [ano, mes]);
 
   const totalMes = contas.length
     ? contas.reduce((total, conta) =>
         total + (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0), 0)
     : 0;
-    
-  useEffect(() => {
-    const listener = () => {
-      console.log('🔁 Esperando para recarregar...');
-      setTimeout(() => {
-        carregar();
-      }, 1000); // aguarda 1 segundo para garantir que a API terminou
-    };
 
-    window.addEventListener('sincronizacao-finalizada', listener);
-    return () => window.removeEventListener('sincronizacao-finalizada', listener);
-  }, []);
+  const totalPago = contas.length
+    ? contas.reduce((total, conta) =>
+        total + (conta.paga
+          ? (conta.valorParcela ?? 0) * (conta.quantidadeParcelas ?? 0)
+          : 0), 0)
+    : 0;
 
-  const carregar = () => {
+  const totalPendente = Math.max(totalMes - totalPago, 0);
+  const receitaTotalNumerica = Number.isFinite(Number(receitaTotal)) ? Number(receitaTotal) : 0;
+  const saldoReceita = receitaTotalNumerica - totalPago;
+
+  const atualizarReceitaTotal = (valor: string) => {
+    setReceitaTotal(valor);
+    const chave = `receita-total-${ano}-${mes}`;
+    if (!valor.trim()) {
+      localStorage.removeItem(chave);
+      return;
+    }
+    localStorage.setItem(chave, valor);
+  };
+
+  const carregar = useCallback(() => {
     api.get<Conta[]>(`/contas?ano=${ano}&mes=${mes}`)
       .then(res => {
         const dados = res.data;
@@ -48,7 +64,19 @@ const ListaContas = () => {
         console.error('Erro ao buscar contas:', err);
         setContas([]);
       });
-  };
+  }, [ano, mes]);
+    
+  useEffect(() => {
+    const listener = () => {
+      console.log('🔁 Esperando para recarregar...');
+      setTimeout(() => {
+        carregar();
+      }, 1000); // aguarda 1 segundo para garantir que a API terminou
+    };
+
+    window.addEventListener('sincronizacao-finalizada', listener);
+    return () => window.removeEventListener('sincronizacao-finalizada', listener);
+  }, [carregar]);
 
   useEffect(() => {
     if (!navigator.onLine) {
@@ -61,7 +89,7 @@ const ListaContas = () => {
       return;
     }
     carregar();
-  }, [ano, mes]);
+  }, [ano, mes, carregar]);
 
   useEffect(() => {
     if (!navigator.onLine) {
@@ -89,19 +117,10 @@ const ListaContas = () => {
           console.error('Erro ao buscar contas:', err);
         });
 
-useEffect(() => {
-  const listener = () => {
-    console.log('🔁 Recarregando após sincronização...');
-    carregar();
-  };
-  window.addEventListener('sincronizacao-finalizada', listener);
-
-  return () => window.removeEventListener('sincronizacao-finalizada', listener);
-}, []);
     }, 500);
 
     return () => clearTimeout(delayDebounce);
-  }, [busca]);
+  }, [busca, ano, mes, carregar]);
 
   const alternarPagamento = (conta: Conta) => {
     const rota = conta.paga ? 'desmarcar' : 'pagar';
@@ -145,7 +164,8 @@ useEffect(() => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err) {
+    } catch (error) {
+      console.error('Erro ao gerar o PDF completo:', error);
       toast.error('Erro ao gerar o PDF completo.');
     }
   };
@@ -167,7 +187,8 @@ useEffect(() => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err) {
+    } catch (error) {
+      console.error('Erro ao gerar o PDF filtrado:', error);
       toast.error('Erro ao gerar o PDF filtrado.');
     }
   };
@@ -202,6 +223,61 @@ useEffect(() => {
           setAtualizacaoGrafico(prev => prev + 1);
         }}
       />
+
+      <div className="resumo-receita">
+        <h2>Receita e Descontos</h2>
+        <label htmlFor="receita-total" className="resumo-label">
+          Receita total do mes
+        </label>
+        <input
+          id="receita-total"
+          type="number"
+          step="0.01"
+          min="0"
+          value={receitaTotal}
+          onChange={(e) => atualizarReceitaTotal(e.target.value)}
+          placeholder="Informe a receita total do mes..."
+        />
+
+        <div className="resumo-grid">
+          <div className="resumo-item">
+            <span className="resumo-item-label">Receita total</span>
+            <strong className="resumo-item-valor">
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              }).format(receitaTotalNumerica)}
+            </strong>
+          </div>
+          <div className="resumo-item">
+            <span className="resumo-item-label">Total descontado (pagas)</span>
+            <strong className="resumo-item-valor">
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              }).format(totalPago)}
+            </strong>
+          </div>
+          <div className="resumo-item">
+            <span className="resumo-item-label">Saldo da receita</span>
+            <strong className={`resumo-item-valor ${saldoReceita < 0 ? 'saldo-negativo' : 'saldo-positivo'}`}>
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              }).format(saldoReceita)}
+            </strong>
+          </div>
+          <div className="resumo-item">
+            <span className="resumo-item-label">Total pendente</span>
+            <strong className="resumo-item-valor">
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              }).format(totalPendente)}
+            </strong>
+          </div>
+        </div>
+      </div>
 
     <div className="botoes-relatorio">
       <button onClick={gerarPdfFiltrado}>📄 Gerar PDF filtrado</button>
