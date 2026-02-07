@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import api from '../services/api';
 import type { Conta } from '../types/Conta';
+import type { ReceitaMensal } from '../types/ReceitaMensal';
 import FormularioNovaConta from './FormularioNovaConta';
 import SeletorMesAno from './SeletorMesAno';
 import { FaTrash, FaCheck, FaUndo, FaEdit } from 'react-icons/fa';
@@ -19,12 +20,9 @@ const ListaContas = () => {
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pagas' | 'nao-pagas'>('todas');
   const [busca, setBusca] = useState('');
   const [receitaTotal, setReceitaTotal] = useState<string>('');
-
-  useEffect(() => {
-    const chave = `receita-total-${ano}-${mes}`;
-    const salva = localStorage.getItem(chave);
-    setReceitaTotal(salva ?? '');
-  }, [ano, mes]);
+  const [receitaServidor, setReceitaServidor] = useState<number | null>(null);
+  const [carregandoReceita, setCarregandoReceita] = useState(false);
+  const [salvandoReceita, setSalvandoReceita] = useState(false);
 
   const totalMes = contas.length
     ? contas.reduce((total, conta) =>
@@ -41,15 +39,54 @@ const ListaContas = () => {
   const totalPendente = Math.max(totalMes - totalPago, 0);
   const receitaTotalNumerica = Number.isFinite(Number(receitaTotal)) ? Number(receitaTotal) : 0;
   const saldoReceita = receitaTotalNumerica - totalPago;
+  const receitaValida = receitaTotal.trim() !== '' && Number.isFinite(Number(receitaTotal));
+  const receitaAlterada = receitaValida
+    ? (receitaServidor === null || Number(receitaTotal) !== receitaServidor)
+    : false;
 
   const atualizarReceitaTotal = (valor: string) => {
     setReceitaTotal(valor);
-    const chave = `receita-total-${ano}-${mes}`;
-    if (!valor.trim()) {
-      localStorage.removeItem(chave);
+  };
+
+  const salvarReceita = () => {
+    if (!receitaTotal.trim()) {
+      toast.info('Informe a receita antes de salvar.');
       return;
     }
-    localStorage.setItem(chave, valor);
+
+    const valorNumerico = Number(receitaTotal);
+    if (!Number.isFinite(valorNumerico)) {
+      toast.error('Informe um valor de receita válido.');
+      return;
+    }
+
+    if (receitaServidor !== null && valorNumerico === receitaServidor) {
+      return;
+    }
+
+    if (!navigator.onLine) {
+      toast.info('Sem conexão. A receita não foi salva.');
+      return;
+    }
+
+    setSalvandoReceita(true);
+    api.put<ReceitaMensal>('/receitas', {
+      ano,
+      mes,
+      valorTotal: valorNumerico
+    })
+      .then(res => {
+        setReceitaServidor(res.data.valorTotal);
+        setReceitaTotal(res.data.valorTotal.toString());
+        toast.success('Receita atualizada com sucesso.');
+      })
+      .catch(error => {
+        console.error('Erro ao salvar receita:', error);
+        toast.error('Erro ao salvar receita.');
+      })
+      .finally(() => {
+        setSalvandoReceita(false);
+      });
   };
 
   const carregar = useCallback(() => {
@@ -65,7 +102,35 @@ const ListaContas = () => {
         setContas([]);
       });
   }, [ano, mes]);
-    
+
+  useEffect(() => {
+    setCarregandoReceita(true);
+    setReceitaServidor(null);
+
+    if (!navigator.onLine) {
+      setReceitaTotal('');
+      setCarregandoReceita(false);
+      return;
+    }
+
+    api.get<ReceitaMensal>(`/receitas?ano=${ano}&mes=${mes}`)
+      .then(res => {
+        setReceitaServidor(res.data.valorTotal);
+        setReceitaTotal(res.data.valorTotal.toString());
+      })
+      .catch(error => {
+        if (error?.response?.status === 404) {
+          setReceitaTotal('');
+          return;
+        }
+        console.error('Erro ao carregar receita:', error);
+        toast.error('Erro ao carregar receita.');
+      })
+      .finally(() => {
+        setCarregandoReceita(false);
+      });
+  }, [ano, mes]);
+
   useEffect(() => {
     const listener = () => {
       console.log('🔁 Esperando para recarregar...');
@@ -237,7 +302,16 @@ const ListaContas = () => {
           value={receitaTotal}
           onChange={(e) => atualizarReceitaTotal(e.target.value)}
           placeholder="Informe a receita total do mes..."
+          disabled={carregandoReceita}
         />
+        <button
+          type="button"
+          className="btn-receita"
+          onClick={salvarReceita}
+          disabled={carregandoReceita || salvandoReceita || !receitaAlterada}
+        >
+          {salvandoReceita ? 'Salvando...' : 'Salvar receita'}
+        </button>
 
         <div className="resumo-grid">
           <div className="resumo-item">
