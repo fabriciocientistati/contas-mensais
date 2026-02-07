@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Quartz;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +33,6 @@ builder.Configuration
     .AddEnvironmentVariables();
 
 Console.WriteLine($"Ambiente: {builder.Environment.EnvironmentName}");
-Console.WriteLine($"Conexão: {builder.Configuration.GetConnectionString("DefaultConnection") ?? "NÃO ENCONTRADA"}");
 
 if (builder.Environment.IsDevelopment())
 {
@@ -49,7 +49,8 @@ else
 {
     Console.WriteLine("🐘 Usando PostgreSQL em Produção");
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+               .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 }
 
 builder.Services.AddCors(options =>
