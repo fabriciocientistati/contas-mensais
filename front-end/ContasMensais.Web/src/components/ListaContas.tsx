@@ -21,6 +21,7 @@ const ListaContas = () => {
   const [contaEditando, setContaEditando] = useState<Conta | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pagas' | 'nao-pagas'>('todas');
   const [busca, setBusca] = useState('');
+  const [filtroDia, setFiltroDia] = useState('');
   const [receitaTotal, setReceitaTotal] = useState<string>('');
   const [receitaExtra, setReceitaExtra] = useState<string>('');
   const [receitaServidor, setReceitaServidor] = useState<number | null>(null);
@@ -60,6 +61,8 @@ const ListaContas = () => {
     ? (receitaServidor === null || receitaTotalNumerica !== receitaServidor)
     : false;
   const receitaExtraValida = receitaExtra.trim() !== '' && receitaExtraNumerica > 0;
+  const diaFiltroNumero = Number(filtroDia);
+  const filtroDiaAtivo = Number.isInteger(diaFiltroNumero) && diaFiltroNumero >= 1 && diaFiltroNumero <= 31;
   const filtrosDisponiveis = [
     { value: 'todas', label: 'Todas' },
     { value: 'pagas', label: 'Pagas' },
@@ -515,14 +518,21 @@ const ListaContas = () => {
   };
 
   const contasFiltradas = contas.filter(conta => {
-    if (filtroStatus === 'pagas') return conta.paga === true;
-    if (filtroStatus === 'nao-pagas') return conta.paga === false;
+    if (filtroStatus === 'pagas' && conta.paga !== true) return false;
+    if (filtroStatus === 'nao-pagas' && conta.paga !== false) return false;
+    if (filtroDiaAtivo) {
+      return dayjs(conta.dataVencimento).date() === diaFiltroNumero;
+    }
     return true;
   });
 
   const limparBusca = () => {
     setBusca('');
     setBuscaSemResultado(false);
+  };
+
+  const limparFiltroDia = () => {
+    setFiltroDia('');
   };
 
   return (
@@ -624,6 +634,43 @@ const ListaContas = () => {
               {filtro.label}
             </button>
           ))}
+        </div>
+        <div className="filtro-dia">
+          <label htmlFor="filtro-dia">Dia do mes</label>
+          <div className="filtro-dia-controles">
+            <div className="filtro-dia-input">
+              <input
+                id="filtro-dia"
+                type="number"
+                min={1}
+                max={31}
+                step={1}
+                inputMode="numeric"
+                placeholder="Dia (1-31)"
+                value={filtroDia}
+                onChange={(e) => setFiltroDia(e.target.value)}
+                aria-label="Filtrar por dia do mes"
+              />
+              {filtroDia.trim() !== '' && (
+                <button
+                  type="button"
+                  className="filtro-dia-limpar"
+                  onClick={limparFiltroDia}
+                  aria-label="Limpar filtro de dia"
+                >
+                  Ã—
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              className="filtro-dia-hoje"
+              onClick={() => setFiltroDia(String(dayjs().date()))}
+            >
+              Hoje
+            </button>
+          </div>
+          <span className="filtro-dia-ajuda">Filtra pelo dia do vencimento (1-31).</span>
         </div>
       </div>
 

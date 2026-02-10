@@ -312,7 +312,7 @@ app.MapPut("/contas/{id}", async (Guid id, [FromBody] ContaDto dto, AppDbContext
             DataVencimento = vencimento,
             ValorParcela = dto.ValorParcela,
             QuantidadeParcelas = 1,
-            Paga = false
+            Paga = i == 0 && contaOriginal.Paga
         };
         novasParcelas.Add(nova);
         db.Contas.Add(nova);
