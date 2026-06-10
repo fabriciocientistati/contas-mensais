@@ -5,5 +5,6 @@ public class EmailSettings
     public string Remetente { get; set; } = string.Empty;
     public List<string> Destinatarios { get; set; } = new();
     public string Senha { get; set; } = string.Empty;
+    public string ResendApiKey { get; set; } = string.Empty;
     public string TestToken { get; set; } = string.Empty;
 }

@@ -1,7 +1,6 @@
-using System.Net;
-using System.Net.Mail;
 using ContasMensais.API.DbContext;
 using ContasMensais.API.Models;
+using ContasMensais.API.Services;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 
@@ -11,11 +10,13 @@ public class EmailJob : IJob
 {
     private readonly EmailSettings _settings;
     private readonly AppDbContext _context;
+    private readonly ResendEmailSender _emailSender;
 
-    public EmailJob(IConfiguration config, AppDbContext context)
+    public EmailJob(IConfiguration config, AppDbContext context, ResendEmailSender emailSender)
     {
         _settings = config.GetSection("EmailSettings").Get<EmailSettings>()!;
         _context = context;
+        _emailSender = emailSender;
     }
 
     public async Task Execute(IJobExecutionContext context)
@@ -25,16 +26,16 @@ public class EmailJob : IJob
 
         Console.WriteLine($"[JOB] Enviando e-mail em: {DateTime.Now}");
         Console.WriteLine(
-            "[EMAIL-CONFIG] Remetente configurado: {0}; Senha configurada: {1}; Destinatarios configurados: {2}",
+            "[EMAIL-CONFIG] Remetente configurado: {0}; ResendApiKey configurada: {1}; Destinatarios configurados: {2}",
             !string.IsNullOrWhiteSpace(_settings.Remetente),
-            !string.IsNullOrWhiteSpace(_settings.Senha),
+            !string.IsNullOrWhiteSpace(_settings.ResendApiKey),
             _settings.Destinatarios.Count);
 
         if (string.IsNullOrWhiteSpace(_settings.Remetente) ||
-            string.IsNullOrWhiteSpace(_settings.Senha) ||
+            string.IsNullOrWhiteSpace(_settings.ResendApiKey) ||
             _settings.Destinatarios.Count == 0)
         {
-            Console.WriteLine("[ERRO] Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__Senha e EmailSettings__Destinatarios__0.");
+            Console.WriteLine("[ERRO] Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__ResendApiKey e EmailSettings__Destinatarios__0.");
             return;
         }
 
@@ -81,34 +82,12 @@ public class EmailJob : IJob
                          Por favor, organize seu pagamento!
 
                          -- Contas-Mensais
-                         """;
+            """;
             try
             {
-                using var smtp = new SmtpClient("smtp.gmail.com", 587)
-                {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(_settings.Remetente, _settings.Senha),
-                    Timeout = 30000
-                };
-
-                foreach (var destinatario in _settings.Destinatarios)
-                {
-                    Console.WriteLine($"[JOB] Tentando enviar e-mail para {destinatario}.");
-
-                    var mail = new MailMessage(_settings.Remetente, destinatario, assunto, corpo)
-                    {
-                        IsBodyHtml = false
-                    };
-
-                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                    await smtp.SendMailAsync(mail, timeout.Token);
-                    Console.WriteLine($"[OK] E-mail enviado para conta \"{conta.Nome}\" ({quando}).");
-                }
-            }
-            catch (OperationCanceledException ex)
-            {
-                Console.WriteLine($"[ERRO] Timeout ao enviar e-mail da conta \"{conta.Nome}\": {ex}");
+                Console.WriteLine($"[JOB] Tentando enviar e-mail via Resend para {_settings.Destinatarios.Count} destinatario(s).");
+                await _emailSender.SendAsync(assunto, corpo, context.CancellationToken);
+                Console.WriteLine($"[OK] E-mail enviado para conta \"{conta.Nome}\" ({quando}).");
             }
             catch (Exception ex)
             {

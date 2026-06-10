@@ -2,6 +2,7 @@ using ContasMensais.API.DbContext;
 using ContasMensais.API.Dtos;
 using ContasMensais.API.Jobs;
 using ContasMensais.API.Models;
+using ContasMensais.API.Services;
 using ContasMensais.API.Validators;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -11,8 +12,6 @@ using Quartz;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using System.Net;
-using System.Net.Mail;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,9 +37,9 @@ Console.WriteLine($"Ambiente: {builder.Environment.EnvironmentName}");
 
 var emailSettings = builder.Configuration.GetSection("EmailSettings").Get<EmailSettings>() ?? new EmailSettings();
 Console.WriteLine(
-    "[EMAIL-CONFIG] Remetente configurado: {0}; Senha configurada: {1}; Destinatarios configurados: {2}",
+    "[EMAIL-CONFIG] Remetente configurado: {0}; ResendApiKey configurada: {1}; Destinatarios configurados: {2}",
     !string.IsNullOrWhiteSpace(emailSettings.Remetente),
-    !string.IsNullOrWhiteSpace(emailSettings.Senha),
+    !string.IsNullOrWhiteSpace(emailSettings.ResendApiKey),
     emailSettings.Destinatarios.Count);
 
 if (builder.Environment.IsDevelopment())
@@ -73,6 +72,11 @@ builder.Services.AddCors(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<ContaValidators>();
+builder.Services.AddHttpClient<ResendEmailSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 builder.Services.AddQuartz(q =>
 {
@@ -345,13 +349,26 @@ app.MapPut("/contas/{id}", async (Guid id, [FromBody] ContaDto dto, AppDbContext
 });
 
 // PUT pagar
-app.MapPut("/contas/{id}/pagar", async (Guid id, AppDbContext db) =>
+app.MapPut("/contas/{id}/pagar", async (Guid id, AppDbContext db, ResendEmailSender emailSender) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
 
     conta.Paga = true;
     await db.SaveChangesAsync();
+
+    try
+    {
+        await emailSender.SendAsync(
+            $"Conta paga - \"{conta.Nome}\"",
+            MontarCorpoEmailAcaoConta("PAGA", conta));
+
+        Console.WriteLine($"[EMAIL-ACAO] Notificacao de conta paga enviada. Conta: {conta.Id} - {conta.Nome}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[EMAIL-ACAO][ERRO] Conta marcada como paga, mas falha ao enviar notificacao. Conta: {conta.Id} - {conta.Nome}. Erro: {ex}");
+    }
 
     return Results.Ok();
 });
@@ -368,13 +385,26 @@ app.MapPut("/contas/{id}/desmarcar", async (Guid id, AppDbContext db) =>
     return Results.Ok();
 });
 
-app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db) =>
+app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db, ResendEmailSender emailSender) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
 
     db.Contas.Remove(conta);
     await db.SaveChangesAsync();
+
+    try
+    {
+        await emailSender.SendAsync(
+            $"Conta deletada - \"{conta.Nome}\"",
+            MontarCorpoEmailAcaoConta("DELETADA", conta));
+
+        Console.WriteLine($"[EMAIL-ACAO] Notificacao de conta deletada enviada. Conta: {conta.Id} - {conta.Nome}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[EMAIL-ACAO][ERRO] Conta deletada, mas falha ao enviar notificacao. Conta: {conta.Id} - {conta.Nome}. Erro: {ex}");
+    }
 
     return Results.NoContent();
 });
@@ -488,6 +518,27 @@ static (int ano, int mes) ObterMesAnterior(int ano, int mes)
     return (ano, mes - 1);
 }
 
+static string MontarCorpoEmailAcaoConta(string acao, Conta conta)
+{
+    return $"""
+            Acao realizada: {acao}
+
+            Informacoes da conta:
+            - Id: {conta.Id}
+            - Nome: {conta.Nome}
+            - Ano: {conta.Ano}
+            - Mes: {conta.Mes}
+            - Data de vencimento: {conta.DataVencimento:dd/MM/yyyy}
+            - Valor da parcela: R$ {conta.ValorParcela:F2}
+            - Quantidade de parcelas: {conta.QuantidadeParcelas}
+            - Status pago: {conta.Paga}
+
+            Data/hora da notificacao: {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}
+
+            -- Contas-Mensais
+            """;
+}
+
 app.MapGet("/contas/pdf", async (
     int? ano, int? mes, string? status, string? nome,
     AppDbContext db) =>
@@ -545,14 +596,14 @@ app.MapGet("/contas/pdf", async (
     return Results.File(bytes, "application/pdf", "Relatorio-Completo.pdf");
 });
 
-app.MapPost("/email/test", async (IConfiguration config, HttpRequest request) =>
+app.MapPost("/email/test", async (ResendEmailSender emailSender, HttpRequest request) =>
 {
-    var settings = config.GetSection("EmailSettings").Get<EmailSettings>() ?? new EmailSettings();
+    var settings = emailSender.GetSettings();
 
     Console.WriteLine(
-        "[EMAIL-TEST] Remetente configurado: {0}; Senha configurada: {1}; Destinatarios configurados: {2}; Token configurado: {3}",
+        "[EMAIL-TEST] Remetente configurado: {0}; ResendApiKey configurada: {1}; Destinatarios configurados: {2}; Token configurado: {3}",
         !string.IsNullOrWhiteSpace(settings.Remetente),
-        !string.IsNullOrWhiteSpace(settings.Senha),
+        !string.IsNullOrWhiteSpace(settings.ResendApiKey),
         settings.Destinatarios.Count,
         !string.IsNullOrWhiteSpace(settings.TestToken));
 
@@ -562,37 +613,14 @@ app.MapPost("/email/test", async (IConfiguration config, HttpRequest request) =>
     if (!request.Headers.TryGetValue("X-Email-Test-Token", out var token) || token != settings.TestToken)
         return Results.Unauthorized();
 
-    if (string.IsNullOrWhiteSpace(settings.Remetente) ||
-        string.IsNullOrWhiteSpace(settings.Senha) ||
-        settings.Destinatarios.Count == 0)
-    {
-        return Results.BadRequest("Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__Senha e EmailSettings__Destinatarios__0.");
-    }
-
     try
     {
-        using var smtp = new SmtpClient("smtp.gmail.com", 587)
-        {
-            EnableSsl = true,
-            UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(settings.Remetente, settings.Senha),
-            Timeout = 30000
-        };
+        Console.WriteLine("[EMAIL-TEST] Tentando enviar e-mail de teste via Resend para {0} destinatario(s).", settings.Destinatarios.Count);
 
-        foreach (var destinatario in settings.Destinatarios)
-        {
-            Console.WriteLine("[EMAIL-TEST] Tentando enviar e-mail de teste para {0}.", destinatario);
-
-            using var mail = new MailMessage(
-                settings.Remetente,
-                destinatario,
-                "Teste de e-mail - Contas Mensais",
-                $"Teste de envio disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.");
-
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            await smtp.SendMailAsync(mail, timeout.Token);
-            Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0}.", destinatario);
-        }
+        await emailSender.SendAsync(
+            "Teste de e-mail - Contas Mensais",
+            $"Teste de envio via Resend disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.",
+            request.HttpContext.RequestAborted);
 
         Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0} destinatario(s).", settings.Destinatarios.Count);
         return Results.Ok(new { mensagem = "E-mail de teste enviado.", destinatarios = settings.Destinatarios.Count });
@@ -600,7 +628,7 @@ app.MapPost("/email/test", async (IConfiguration config, HttpRequest request) =>
     catch (OperationCanceledException ex)
     {
         Console.WriteLine($"[EMAIL-TEST][ERRO] Timeout ao enviar e-mail de teste: {ex}");
-        return Results.Problem("Timeout ao enviar e-mail de teste. Possivel bloqueio de SMTP/porta 587 no ambiente de producao.", statusCode: StatusCodes.Status504GatewayTimeout);
+        return Results.Problem("Timeout ao enviar e-mail de teste pela API do Resend.", statusCode: StatusCodes.Status504GatewayTimeout);
     }
     catch (Exception ex)
     {
