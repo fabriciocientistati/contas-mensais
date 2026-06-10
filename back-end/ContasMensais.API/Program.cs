@@ -575,22 +575,32 @@ app.MapPost("/email/test", async (IConfiguration config, HttpRequest request) =>
         {
             EnableSsl = true,
             UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(settings.Remetente, settings.Senha)
+            Credentials = new NetworkCredential(settings.Remetente, settings.Senha),
+            Timeout = 30000
         };
 
         foreach (var destinatario in settings.Destinatarios)
         {
+            Console.WriteLine("[EMAIL-TEST] Tentando enviar e-mail de teste para {0}.", destinatario);
+
             using var mail = new MailMessage(
                 settings.Remetente,
                 destinatario,
                 "Teste de e-mail - Contas Mensais",
                 $"Teste de envio disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.");
 
-            await smtp.SendMailAsync(mail);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await smtp.SendMailAsync(mail, timeout.Token);
+            Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0}.", destinatario);
         }
 
         Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0} destinatario(s).", settings.Destinatarios.Count);
         return Results.Ok(new { mensagem = "E-mail de teste enviado.", destinatarios = settings.Destinatarios.Count });
+    }
+    catch (OperationCanceledException ex)
+    {
+        Console.WriteLine($"[EMAIL-TEST][ERRO] Timeout ao enviar e-mail de teste: {ex}");
+        return Results.Problem("Timeout ao enviar e-mail de teste. Possivel bloqueio de SMTP/porta 587 no ambiente de producao.", statusCode: StatusCodes.Status504GatewayTimeout);
     }
     catch (Exception ex)
     {

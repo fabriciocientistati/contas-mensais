@@ -88,19 +88,27 @@ public class EmailJob : IJob
                 {
                     EnableSsl = true,
                     UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(_settings.Remetente, _settings.Senha)
+                    Credentials = new NetworkCredential(_settings.Remetente, _settings.Senha),
+                    Timeout = 30000
                 };
 
                 foreach (var destinatario in _settings.Destinatarios)
                 {
+                    Console.WriteLine($"[JOB] Tentando enviar e-mail para {destinatario}.");
+
                     var mail = new MailMessage(_settings.Remetente, destinatario, assunto, corpo)
                     {
                         IsBodyHtml = false
                     };
 
-                    await smtp.SendMailAsync(mail);
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await smtp.SendMailAsync(mail, timeout.Token);
                     Console.WriteLine($"[OK] E-mail enviado para conta \"{conta.Nome}\" ({quando}).");
                 }
+            }
+            catch (OperationCanceledException ex)
+            {
+                Console.WriteLine($"[ERRO] Timeout ao enviar e-mail da conta \"{conta.Nome}\": {ex}");
             }
             catch (Exception ex)
             {
