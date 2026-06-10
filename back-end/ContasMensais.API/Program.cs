@@ -11,6 +11,8 @@ using Quartz;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Net;
+using System.Net.Mail;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +35,13 @@ builder.Configuration
     .AddEnvironmentVariables();
 
 Console.WriteLine($"Ambiente: {builder.Environment.EnvironmentName}");
+
+var emailSettings = builder.Configuration.GetSection("EmailSettings").Get<EmailSettings>() ?? new EmailSettings();
+Console.WriteLine(
+    "[EMAIL-CONFIG] Remetente configurado: {0}; Senha configurada: {1}; Destinatarios configurados: {2}",
+    !string.IsNullOrWhiteSpace(emailSettings.Remetente),
+    !string.IsNullOrWhiteSpace(emailSettings.Senha),
+    emailSettings.Destinatarios.Count);
 
 if (builder.Environment.IsDevelopment())
 {
@@ -536,6 +545,59 @@ app.MapGet("/contas/pdf", async (
     return Results.File(bytes, "application/pdf", "Relatorio-Completo.pdf");
 });
 
+app.MapPost("/email/test", async (IConfiguration config, HttpRequest request) =>
+{
+    var settings = config.GetSection("EmailSettings").Get<EmailSettings>() ?? new EmailSettings();
+
+    Console.WriteLine(
+        "[EMAIL-TEST] Remetente configurado: {0}; Senha configurada: {1}; Destinatarios configurados: {2}; Token configurado: {3}",
+        !string.IsNullOrWhiteSpace(settings.Remetente),
+        !string.IsNullOrWhiteSpace(settings.Senha),
+        settings.Destinatarios.Count,
+        !string.IsNullOrWhiteSpace(settings.TestToken));
+
+    if (string.IsNullOrWhiteSpace(settings.TestToken))
+        return Results.Problem("Token de teste de e-mail nao configurado.", statusCode: StatusCodes.Status500InternalServerError);
+
+    if (!request.Headers.TryGetValue("X-Email-Test-Token", out var token) || token != settings.TestToken)
+        return Results.Unauthorized();
+
+    if (string.IsNullOrWhiteSpace(settings.Remetente) ||
+        string.IsNullOrWhiteSpace(settings.Senha) ||
+        settings.Destinatarios.Count == 0)
+    {
+        return Results.BadRequest("Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__Senha e EmailSettings__Destinatarios__0.");
+    }
+
+    try
+    {
+        using var smtp = new SmtpClient("smtp.gmail.com", 587)
+        {
+            EnableSsl = true,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(settings.Remetente, settings.Senha)
+        };
+
+        foreach (var destinatario in settings.Destinatarios)
+        {
+            using var mail = new MailMessage(
+                settings.Remetente,
+                destinatario,
+                "Teste de e-mail - Contas Mensais",
+                $"Teste de envio disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.");
+
+            await smtp.SendMailAsync(mail);
+        }
+
+        Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0} destinatario(s).", settings.Destinatarios.Count);
+        return Results.Ok(new { mensagem = "E-mail de teste enviado.", destinatarios = settings.Destinatarios.Count });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[EMAIL-TEST][ERRO] Falha no envio manual: {ex}");
+        return Results.Problem("Falha ao enviar e-mail de teste. Verifique os logs da aplicacao.", statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
 
 app.Run();
 

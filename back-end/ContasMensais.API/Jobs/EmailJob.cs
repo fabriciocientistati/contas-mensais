@@ -24,10 +24,19 @@ public class EmailJob : IJob
         var amanha = hoje.AddDays(1);
 
         Console.WriteLine($"[JOB] Enviando e-mail em: {DateTime.Now}");
-        var senhaDebug = string.IsNullOrEmpty(_settings.Senha) || _settings.Senha.Length < 4
-            ? "(senha não definida ou curta)"
-            : _settings.Senha.Substring(0, 4) + "...";
-        Console.WriteLine($"[DEBUG] Senha vinda de User Secrets: {senhaDebug}");
+        Console.WriteLine(
+            "[EMAIL-CONFIG] Remetente configurado: {0}; Senha configurada: {1}; Destinatarios configurados: {2}",
+            !string.IsNullOrWhiteSpace(_settings.Remetente),
+            !string.IsNullOrWhiteSpace(_settings.Senha),
+            _settings.Destinatarios.Count);
+
+        if (string.IsNullOrWhiteSpace(_settings.Remetente) ||
+            string.IsNullOrWhiteSpace(_settings.Senha) ||
+            _settings.Destinatarios.Count == 0)
+        {
+            Console.WriteLine("[ERRO] Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__Senha e EmailSettings__Destinatarios__0.");
+            return;
+        }
 
         var contas = await _context.Contas
             .Where(c => 
@@ -95,7 +104,7 @@ public class EmailJob : IJob
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERRO] Falha ao enviar e-mail da conta \"{conta.Nome}\": {ex.Message}");
+                Console.WriteLine($"[ERRO] Falha ao enviar e-mail da conta \"{conta.Nome}\": {ex}");
             }
         }
     }
