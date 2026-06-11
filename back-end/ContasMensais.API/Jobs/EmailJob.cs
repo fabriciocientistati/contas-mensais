@@ -10,9 +10,9 @@ public class EmailJob : IJob
 {
     private readonly EmailSettings _settings;
     private readonly AppDbContext _context;
-    private readonly ResendEmailSender _emailSender;
+    private readonly GmailEmailSender _emailSender;
 
-    public EmailJob(IConfiguration config, AppDbContext context, ResendEmailSender emailSender)
+    public EmailJob(IConfiguration config, AppDbContext context, GmailEmailSender emailSender)
     {
         _settings = config.GetSection("EmailSettings").Get<EmailSettings>()!;
         _context = context;
@@ -23,19 +23,21 @@ public class EmailJob : IJob
     {
         var hoje = DateOnly.FromDateTime(DateTime.Today);
         var amanha = hoje.AddDays(1);
+        var gmailSettings = _emailSender.GetGmailSettings();
 
         Console.WriteLine($"[JOB] Enviando e-mail em: {DateTime.Now}");
         Console.WriteLine(
-            "[EMAIL-CONFIG] Remetente configurado: {0}; ResendApiKey configurada: {1}; Destinatarios configurados: {2}",
+            "[EMAIL-CONFIG] Remetente configurado: {0}; Destinatarios configurados: {1}; Gmail OAuth configurado: {2}",
             !string.IsNullOrWhiteSpace(_settings.Remetente),
-            !string.IsNullOrWhiteSpace(_settings.ResendApiKey),
-            _settings.Destinatarios.Count);
+            _settings.Destinatarios.Count,
+            !string.IsNullOrWhiteSpace(gmailSettings.ClientId) &&
+            !string.IsNullOrWhiteSpace(gmailSettings.ClientSecret) &&
+            !string.IsNullOrWhiteSpace(gmailSettings.RefreshToken));
 
         if (string.IsNullOrWhiteSpace(_settings.Remetente) ||
-            string.IsNullOrWhiteSpace(_settings.ResendApiKey) ||
             _settings.Destinatarios.Count == 0)
         {
-            Console.WriteLine("[ERRO] Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__ResendApiKey e EmailSettings__Destinatarios__0.");
+            Console.WriteLine("[ERRO] Configuracao de e-mail incompleta. Verifique EmailSettings__Remetente, EmailSettings__Destinatarios__0 e GmailSettings.");
             return;
         }
 
@@ -85,7 +87,7 @@ public class EmailJob : IJob
             """;
             try
             {
-                Console.WriteLine($"[JOB] Tentando enviar e-mail via Resend para {_settings.Destinatarios.Count} destinatario(s).");
+                Console.WriteLine($"[JOB] Tentando enviar e-mail via Gmail API para {_settings.Destinatarios.Count} destinatario(s).");
                 await _emailSender.SendAsync(assunto, corpo, context.CancellationToken);
                 Console.WriteLine($"[OK] E-mail enviado para conta \"{conta.Nome}\" ({quando}).");
             }

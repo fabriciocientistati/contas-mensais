@@ -37,10 +37,12 @@ Console.WriteLine($"Ambiente: {builder.Environment.EnvironmentName}");
 
 var emailSettings = builder.Configuration.GetSection("EmailSettings").Get<EmailSettings>() ?? new EmailSettings();
 Console.WriteLine(
-    "[EMAIL-CONFIG] Remetente configurado: {0}; ResendApiKey configurada: {1}; Destinatarios configurados: {2}",
+    "[EMAIL-CONFIG] Remetente configurado: {0}; Destinatarios configurados: {1}; Gmail OAuth configurado: {2}",
     !string.IsNullOrWhiteSpace(emailSettings.Remetente),
-    !string.IsNullOrWhiteSpace(emailSettings.ResendApiKey),
-    emailSettings.Destinatarios.Count);
+    emailSettings.Destinatarios.Count,
+    !string.IsNullOrWhiteSpace(builder.Configuration["GmailSettings:ClientId"]) &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["GmailSettings:ClientSecret"]) &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["GmailSettings:RefreshToken"]));
 
 if (builder.Environment.IsDevelopment())
 {
@@ -72,9 +74,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<ContaValidators>();
-builder.Services.AddHttpClient<ResendEmailSender>(client =>
+builder.Services.AddHttpClient<GmailEmailSender>(client =>
 {
-    client.BaseAddress = new Uri("https://api.resend.com/");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
@@ -349,7 +350,7 @@ app.MapPut("/contas/{id}", async (Guid id, [FromBody] ContaDto dto, AppDbContext
 });
 
 // PUT pagar
-app.MapPut("/contas/{id}/pagar", async (Guid id, AppDbContext db, ResendEmailSender emailSender) =>
+app.MapPut("/contas/{id}/pagar", async (Guid id, AppDbContext db, GmailEmailSender emailSender) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
@@ -385,7 +386,7 @@ app.MapPut("/contas/{id}/desmarcar", async (Guid id, AppDbContext db) =>
     return Results.Ok();
 });
 
-app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db, ResendEmailSender emailSender) =>
+app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db, GmailEmailSender emailSender) =>
 {
     var conta = await db.Contas.FindAsync(id);
     if (conta is null) return Results.NotFound();
@@ -596,15 +597,18 @@ app.MapGet("/contas/pdf", async (
     return Results.File(bytes, "application/pdf", "Relatorio-Completo.pdf");
 });
 
-app.MapPost("/email/test", async (ResendEmailSender emailSender, HttpRequest request) =>
+app.MapPost("/email/test", async (GmailEmailSender emailSender, HttpRequest request) =>
 {
-    var settings = emailSender.GetSettings();
+    var settings = emailSender.GetEmailSettings();
+    var gmailSettings = emailSender.GetGmailSettings();
 
     Console.WriteLine(
-        "[EMAIL-TEST] Remetente configurado: {0}; ResendApiKey configurada: {1}; Destinatarios configurados: {2}; Token configurado: {3}",
+        "[EMAIL-TEST] Remetente configurado: {0}; Destinatarios configurados: {1}; Gmail OAuth configurado: {2}; Token configurado: {3}",
         !string.IsNullOrWhiteSpace(settings.Remetente),
-        !string.IsNullOrWhiteSpace(settings.ResendApiKey),
         settings.Destinatarios.Count,
+        !string.IsNullOrWhiteSpace(gmailSettings.ClientId) &&
+        !string.IsNullOrWhiteSpace(gmailSettings.ClientSecret) &&
+        !string.IsNullOrWhiteSpace(gmailSettings.RefreshToken),
         !string.IsNullOrWhiteSpace(settings.TestToken));
 
     if (string.IsNullOrWhiteSpace(settings.TestToken))
@@ -615,11 +619,11 @@ app.MapPost("/email/test", async (ResendEmailSender emailSender, HttpRequest req
 
     try
     {
-        Console.WriteLine("[EMAIL-TEST] Tentando enviar e-mail de teste via Resend para {0} destinatario(s).", settings.Destinatarios.Count);
+        Console.WriteLine("[EMAIL-TEST] Tentando enviar e-mail de teste via Gmail API para {0} destinatario(s).", settings.Destinatarios.Count);
 
         await emailSender.SendAsync(
             "Teste de e-mail - Contas Mensais",
-            $"Teste de envio via Resend disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.",
+            $"Teste de envio via Gmail API disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.",
             request.HttpContext.RequestAborted);
 
         Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0} destinatario(s).", settings.Destinatarios.Count);
@@ -628,7 +632,7 @@ app.MapPost("/email/test", async (ResendEmailSender emailSender, HttpRequest req
     catch (OperationCanceledException ex)
     {
         Console.WriteLine($"[EMAIL-TEST][ERRO] Timeout ao enviar e-mail de teste: {ex}");
-        return Results.Problem("Timeout ao enviar e-mail de teste pela API do Resend.", statusCode: StatusCodes.Status504GatewayTimeout);
+        return Results.Problem("Timeout ao enviar e-mail de teste pela Gmail API.", statusCode: StatusCodes.Status504GatewayTimeout);
     }
     catch (Exception ex)
     {
