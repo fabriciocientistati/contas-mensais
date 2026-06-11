@@ -8,10 +8,14 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 using Quartz;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +48,18 @@ Console.WriteLine(
     !string.IsNullOrWhiteSpace(builder.Configuration["GmailSettings:ClientSecret"]) &&
     !string.IsNullOrWhiteSpace(builder.Configuration["GmailSettings:RefreshToken"]));
 
+var authSettings = builder.Configuration.GetSection("AuthSettings").Get<AuthSettings>() ?? new AuthSettings();
+if (string.IsNullOrWhiteSpace(authSettings.JwtSecret) || authSettings.JwtSecret.Length < 32)
+{
+    if (!builder.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("Configure AuthSettings__JwtSecret com pelo menos 32 caracteres.");
+    }
+
+    authSettings.JwtSecret = "dev-local-contas-mensais-jwt-secret-32";
+    Console.WriteLine("[AUTH][AVISO] Usando JwtSecret local apenas para desenvolvimento.");
+}
+
 if (builder.Environment.IsDevelopment())
 {
     Console.WriteLine("📦 Usando SQLite no ambiente Development");
@@ -74,6 +90,29 @@ builder.Services.AddCors(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<ContaValidators>();
+builder.Services.AddScoped<PasswordHasher>();
+builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<AdminUserSeeder>();
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSettings.JwtSecret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 builder.Services.AddHttpClient<GmailEmailSender>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
@@ -111,11 +150,41 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    var adminSeeder = scope.ServiceProvider.GetRequiredService<AdminUserSeeder>();
+    await adminSeeder.SeedAsync();
 }
 
 app.UseCors("CorsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Rotas
+
+app.MapPost("/auth/login", async (
+    [FromBody] LoginRequest request,
+    AppDbContext db,
+    PasswordHasher passwordHasher,
+    JwtTokenService jwtTokenService) =>
+{
+    var email = request.Email.Trim().ToLowerInvariant();
+
+    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
+        return Results.BadRequest("Informe e-mail e senha.");
+
+    var usuario = await db.Usuarios.FirstOrDefaultAsync(u => u.Email == email);
+
+    if (usuario is null || !passwordHasher.Verify(request.Password, usuario.PasswordHash))
+        return Results.Unauthorized();
+
+    var tokenData = jwtTokenService.CreateToken(usuario);
+
+    return Results.Ok(new LoginResponse
+    {
+        Token = tokenData.Token,
+        Email = usuario.Email,
+        ExpiresAt = tokenData.ExpiresAt
+    });
+}).AllowAnonymous();
 
 app.MapGet("/", async (AppDbContext db) =>
 {
@@ -718,7 +787,7 @@ app.MapPost("/email/test", async (GmailEmailSender emailSender, HttpRequest requ
         Console.WriteLine($"[EMAIL-TEST][ERRO] Falha no envio manual: {ex}");
         return Results.Problem("Falha ao enviar e-mail de teste. Verifique os logs da aplicacao.", statusCode: StatusCodes.Status500InternalServerError);
     }
-});
+}).AllowAnonymous();
 
 static string MontarHtmlEmailTeste()
 {

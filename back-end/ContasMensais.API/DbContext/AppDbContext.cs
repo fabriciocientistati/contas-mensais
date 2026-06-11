@@ -9,4 +9,12 @@ public class AppDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     public DbSet<Conta> Contas => Set<Conta>();
     public DbSet<ReceitaMensal> Receitas => Set<ReceitaMensal>();
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Usuario>()
+            .HasIndex(usuario => usuario.Email)
+            .IsUnique();
+    }
 }
