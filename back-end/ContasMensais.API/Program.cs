@@ -362,7 +362,8 @@ app.MapPut("/contas/{id}/pagar", async (Guid id, AppDbContext db, GmailEmailSend
     {
         await emailSender.SendAsync(
             $"Conta paga - \"{conta.Nome}\"",
-            MontarCorpoEmailAcaoConta("PAGA", conta));
+            MontarTextoEmailAcaoConta("PAGA", conta),
+            html: MontarHtmlEmailAcaoConta("PAGA", conta));
 
         Console.WriteLine($"[EMAIL-ACAO] Notificacao de conta paga enviada. Conta: {conta.Id} - {conta.Nome}");
     }
@@ -398,7 +399,8 @@ app.MapDelete("/contas/{id}", async (Guid id, AppDbContext db, GmailEmailSender 
     {
         await emailSender.SendAsync(
             $"Conta deletada - \"{conta.Nome}\"",
-            MontarCorpoEmailAcaoConta("DELETADA", conta));
+            MontarTextoEmailAcaoConta("DELETADA", conta),
+            html: MontarHtmlEmailAcaoConta("DELETADA", conta));
 
         Console.WriteLine($"[EMAIL-ACAO] Notificacao de conta deletada enviada. Conta: {conta.Id} - {conta.Nome}");
     }
@@ -519,7 +521,7 @@ static (int ano, int mes) ObterMesAnterior(int ano, int mes)
     return (ano, mes - 1);
 }
 
-static string MontarCorpoEmailAcaoConta(string acao, Conta conta)
+static string MontarTextoEmailAcaoConta(string acao, Conta conta)
 {
     return $"""
             Acao realizada: {acao}
@@ -537,6 +539,66 @@ static string MontarCorpoEmailAcaoConta(string acao, Conta conta)
             Data/hora da notificacao: {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}
 
             -- Contas-Mensais
+            """;
+}
+
+static string MontarHtmlEmailAcaoConta(string acao, Conta conta)
+{
+    var acaoNormalizada = acao.Equals("PAGA", StringComparison.OrdinalIgnoreCase) ? "Conta paga" : "Conta deletada";
+    var statusCor = acao.Equals("PAGA", StringComparison.OrdinalIgnoreCase) ? "#0f9f6e" : "#c2410c";
+    var statusTexto = conta.Paga ? "Paga" : "Nao paga";
+
+    return $$"""
+             <!doctype html>
+             <html lang="pt-BR">
+             <body style="margin:0;background:#f3f4f6;font-family:Segoe UI,Arial,sans-serif;color:#172033;">
+               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:28px 12px;">
+                 <tr>
+                   <td align="center">
+                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                       <tr>
+                         <td style="padding:26px 28px;background:#111827;color:#ffffff;">
+                           <div style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Contas Mensais</div>
+                           <h1 style="margin:8px 0 0;font-size:26px;line-height:1.2;font-weight:700;">{{acaoNormalizada}}</h1>
+                         </td>
+                       </tr>
+                       <tr>
+                         <td style="padding:26px 28px;">
+                           <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:{{statusCor}};color:#ffffff;font-size:13px;font-weight:700;">
+                             {{acao}}
+                           </div>
+                           <h2 style="margin:18px 0 8px;font-size:22px;line-height:1.3;color:#111827;">{{System.Net.WebUtility.HtmlEncode(conta.Nome)}}</h2>
+                           <p style="margin:0 0 22px;color:#4b5563;font-size:15px;line-height:1.5;">Uma acao foi registrada para esta conta.</p>
+                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:15px;">
+                             {{LinhaHtml("Id", conta.Id.ToString())}}
+                             {{LinhaHtml("Ano", conta.Ano.ToString())}}
+                             {{LinhaHtml("Mes", conta.Mes.ToString())}}
+                             {{LinhaHtml("Data de vencimento", conta.DataVencimento.ToString("dd/MM/yyyy"))}}
+                             {{LinhaHtml("Valor da parcela", $"R$ {conta.ValorParcela:F2}")}}
+                             {{LinhaHtml("Quantidade de parcelas", conta.QuantidadeParcelas.ToString())}}
+                             {{LinhaHtml("Status", statusTexto)}}
+                           </table>
+                           <p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
+                             Notificacao gerada em {{DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}}.
+                           </p>
+                         </td>
+                       </tr>
+                     </table>
+                   </td>
+                 </tr>
+               </table>
+             </body>
+             </html>
+             """;
+}
+
+static string LinhaHtml(string label, string value)
+{
+    return $"""
+            <tr>
+              <td style="padding:11px 0;border-top:1px solid #e5e7eb;color:#6b7280;width:42%;">{System.Net.WebUtility.HtmlEncode(label)}</td>
+              <td style="padding:11px 0;border-top:1px solid #e5e7eb;color:#111827;font-weight:600;">{System.Net.WebUtility.HtmlEncode(value)}</td>
+            </tr>
             """;
 }
 
@@ -624,7 +686,8 @@ app.MapPost("/email/test", async (GmailEmailSender emailSender, HttpRequest requ
         await emailSender.SendAsync(
             "Teste de e-mail - Contas Mensais",
             $"Teste de envio via Gmail API disparado manualmente em {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}.",
-            request.HttpContext.RequestAborted);
+            request.HttpContext.RequestAborted,
+            MontarHtmlEmailTeste());
 
         Console.WriteLine("[EMAIL-TEST] E-mail de teste enviado para {0} destinatario(s).", settings.Destinatarios.Count);
         return Results.Ok(new { mensagem = "E-mail de teste enviado.", destinatarios = settings.Destinatarios.Count });
@@ -640,6 +703,41 @@ app.MapPost("/email/test", async (GmailEmailSender emailSender, HttpRequest requ
         return Results.Problem("Falha ao enviar e-mail de teste. Verifique os logs da aplicacao.", statusCode: StatusCodes.Status500InternalServerError);
     }
 });
+
+static string MontarHtmlEmailTeste()
+{
+    return $$"""
+             <!doctype html>
+             <html lang="pt-BR">
+             <body style="margin:0;background:#f3f4f6;font-family:Segoe UI,Arial,sans-serif;color:#172033;">
+               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:28px 12px;">
+                 <tr>
+                   <td align="center">
+                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                       <tr>
+                         <td style="padding:26px 28px;background:#111827;color:#ffffff;">
+                           <div style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Contas Mensais</div>
+                           <h1 style="margin:8px 0 0;font-size:26px;line-height:1.2;font-weight:700;">Teste de envio realizado</h1>
+                         </td>
+                       </tr>
+                       <tr>
+                         <td style="padding:26px 28px;">
+                           <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.6;">
+                             A integracao com a Gmail API esta funcionando corretamente.
+                           </p>
+                           <p style="margin:22px 0 0;color:#6b7280;font-size:13px;">
+                             Notificacao gerada em {{DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}}.
+                           </p>
+                         </td>
+                       </tr>
+                     </table>
+                   </td>
+                 </tr>
+               </table>
+             </body>
+             </html>
+             """;
+}
 
 app.Run();
 

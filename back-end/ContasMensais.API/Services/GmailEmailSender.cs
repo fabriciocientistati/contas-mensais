@@ -15,7 +15,7 @@ public class GmailEmailSender
         _configuration = configuration;
     }
 
-    public async Task SendAsync(string subject, string text, CancellationToken cancellationToken = default)
+    public async Task SendAsync(string subject, string text, CancellationToken cancellationToken = default, string? html = null)
     {
         var emailSettings = GetEmailSettings();
         var gmailSettings = GetGmailSettings();
@@ -30,7 +30,7 @@ public class GmailEmailSender
         }
 
         var accessToken = await GetAccessTokenAsync(gmailSettings, cancellationToken);
-        var rawMessage = BuildRawMessage(emailSettings.Remetente, emailSettings.Destinatarios, subject, text);
+        var rawMessage = BuildRawMessage(emailSettings.Remetente, emailSettings.Destinatarios, subject, text, html);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/messages/send")
         {
@@ -86,8 +86,13 @@ public class GmailEmailSender
                ?? throw new InvalidOperationException("Google OAuth nao retornou access_token.");
     }
 
-    private static string BuildRawMessage(string from, IEnumerable<string> to, string subject, string text)
+    private static string BuildRawMessage(string from, IEnumerable<string> to, string subject, string text, string? html)
     {
+        if (!string.IsNullOrWhiteSpace(html))
+        {
+            return BuildMultipartRawMessage(from, to, subject, text, html);
+        }
+
         var message = string.Join("\r\n", new[]
         {
             $"From: {from}",
@@ -98,6 +103,33 @@ public class GmailEmailSender
             "Content-Transfer-Encoding: base64",
             "",
             Convert.ToBase64String(Encoding.UTF8.GetBytes(text))
+        });
+
+        return Base64UrlEncode(Encoding.UTF8.GetBytes(message));
+    }
+
+    private static string BuildMultipartRawMessage(string from, IEnumerable<string> to, string subject, string text, string html)
+    {
+        var boundary = $"contas-mensais-{Guid.NewGuid():N}";
+        var message = string.Join("\r\n", new[]
+        {
+            $"From: {from}",
+            $"To: {string.Join(", ", to)}",
+            $"Subject: {EncodeHeader(subject)}",
+            "MIME-Version: 1.0",
+            $"Content-Type: multipart/alternative; boundary=\"{boundary}\"",
+            "",
+            $"--{boundary}",
+            "Content-Type: text/plain; charset=utf-8",
+            "Content-Transfer-Encoding: base64",
+            "",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(text)),
+            $"--{boundary}",
+            "Content-Type: text/html; charset=utf-8",
+            "Content-Transfer-Encoding: base64",
+            "",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(html)),
+            $"--{boundary}--"
         });
 
         return Base64UrlEncode(Encoding.UTF8.GetBytes(message));
