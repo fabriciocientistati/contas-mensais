@@ -523,20 +523,23 @@ static (int ano, int mes) ObterMesAnterior(int ano, int mes)
 
 static string MontarTextoEmailAcaoConta(string acao, Conta conta)
 {
-    return $"""
-            Acao realizada: {acao}
+    var dataNotificacao = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-4));
+    var statusTexto = conta.Paga ? "Paga" : "Não paga";
 
-            Informacoes da conta:
+    return $"""
+            Ação realizada: {acao}
+
+            Informações da conta:
             - Id: {conta.Id}
             - Nome: {conta.Nome}
             - Ano: {conta.Ano}
-            - Mes: {conta.Mes}
+            - Mês: {conta.Mes}
             - Data de vencimento: {conta.DataVencimento:dd/MM/yyyy}
-            - Valor da parcela: R$ {conta.ValorParcela:F2}
+            - Valor da parcela: {FormatarMoeda(conta.ValorParcela)}
             - Quantidade de parcelas: {conta.QuantidadeParcelas}
-            - Status pago: {conta.Paga}
+            - Status: {statusTexto}
 
-            Data/hora da notificacao: {DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}
+            Notificação gerada em {FormatarDataHoraCuiaba(dataNotificacao)}
 
             -- Contas-Mensais
             """;
@@ -545,41 +548,44 @@ static string MontarTextoEmailAcaoConta(string acao, Conta conta)
 static string MontarHtmlEmailAcaoConta(string acao, Conta conta)
 {
     var acaoNormalizada = acao.Equals("PAGA", StringComparison.OrdinalIgnoreCase) ? "Conta paga" : "Conta deletada";
-    var statusCor = acao.Equals("PAGA", StringComparison.OrdinalIgnoreCase) ? "#0f9f6e" : "#c2410c";
-    var statusTexto = conta.Paga ? "Paga" : "Nao paga";
+    var statusCor = acao.Equals("PAGA", StringComparison.OrdinalIgnoreCase) ? "#0f766e" : "#b42318";
+    var statusTexto = conta.Paga ? "Paga" : "Não paga";
+    var dataNotificacao = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-4));
+    var nomeConta = System.Net.WebUtility.HtmlEncode(conta.Nome);
+    var idCurto = conta.Id.ToString()[..8];
 
     return $$"""
              <!doctype html>
              <html lang="pt-BR">
-             <body style="margin:0;background:#f3f4f6;font-family:Segoe UI,Arial,sans-serif;color:#172033;">
-               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:28px 12px;">
+             <body style="margin:0;background:#eef1f5;font-family:Segoe UI,Arial,sans-serif;color:#182033;">
+               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef1f5;padding:24px 10px;">
                  <tr>
                    <td align="center">
-                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #dde3ea;border-radius:16px;overflow:hidden;">
                        <tr>
-                         <td style="padding:26px 28px;background:#111827;color:#ffffff;">
-                           <div style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Contas Mensais</div>
-                           <h1 style="margin:8px 0 0;font-size:26px;line-height:1.2;font-weight:700;">{{acaoNormalizada}}</h1>
+                         <td style="padding:28px;background:#273142;color:#ffffff;">
+                           <div style="font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#b8c2d3;">Contas Mensais</div>
+                           <h1 style="margin:10px 0 0;font-size:28px;line-height:1.2;font-weight:700;">{{acaoNormalizada}}</h1>
                          </td>
                        </tr>
                        <tr>
-                         <td style="padding:26px 28px;">
-                           <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:{{statusCor}};color:#ffffff;font-size:13px;font-weight:700;">
+                         <td style="padding:26px 28px 30px;">
+                           <div style="display:inline-block;padding:8px 13px;border-radius:999px;background:{{statusCor}};color:#ffffff;font-size:13px;font-weight:700;letter-spacing:.04em;">
                              {{acao}}
                            </div>
-                           <h2 style="margin:18px 0 8px;font-size:22px;line-height:1.3;color:#111827;">{{System.Net.WebUtility.HtmlEncode(conta.Nome)}}</h2>
-                           <p style="margin:0 0 22px;color:#4b5563;font-size:15px;line-height:1.5;">Uma acao foi registrada para esta conta.</p>
+                           <h2 style="margin:18px 0 8px;font-size:24px;line-height:1.3;color:#111827;">{{nomeConta}}</h2>
+                           <p style="margin:0 0 22px;color:#536173;font-size:15px;line-height:1.55;">Uma movimentação foi registrada para esta conta.</p>
                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:15px;">
-                             {{LinhaHtml("Id", conta.Id.ToString())}}
                              {{LinhaHtml("Ano", conta.Ano.ToString())}}
-                             {{LinhaHtml("Mes", conta.Mes.ToString())}}
+                             {{LinhaHtml("Mês", conta.Mes.ToString())}}
                              {{LinhaHtml("Data de vencimento", conta.DataVencimento.ToString("dd/MM/yyyy"))}}
-                             {{LinhaHtml("Valor da parcela", $"R$ {conta.ValorParcela:F2}")}}
+                             {{LinhaHtml("Valor da parcela", FormatarMoeda(conta.ValorParcela))}}
                              {{LinhaHtml("Quantidade de parcelas", conta.QuantidadeParcelas.ToString())}}
                              {{LinhaHtml("Status", statusTexto)}}
                            </table>
-                           <p style="margin:24px 0 0;color:#6b7280;font-size:13px;">
-                             Notificacao gerada em {{DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}}.
+                           <p style="margin:22px 0 0;color:#697586;font-size:13px;line-height:1.5;">
+                             Notificação gerada em {{FormatarDataHoraCuiaba(dataNotificacao)}}.
+                             <br>Referência da conta: {{idCurto}}
                            </p>
                          </td>
                        </tr>
@@ -596,10 +602,20 @@ static string LinhaHtml(string label, string value)
 {
     return $"""
             <tr>
-              <td style="padding:11px 0;border-top:1px solid #e5e7eb;color:#6b7280;width:42%;">{System.Net.WebUtility.HtmlEncode(label)}</td>
-              <td style="padding:11px 0;border-top:1px solid #e5e7eb;color:#111827;font-weight:600;">{System.Net.WebUtility.HtmlEncode(value)}</td>
+              <td style="padding:12px 0;border-top:1px solid #e6eaf0;color:#697586;width:44%;vertical-align:top;">{System.Net.WebUtility.HtmlEncode(label)}</td>
+              <td style="padding:12px 0;border-top:1px solid #e6eaf0;color:#111827;font-weight:700;vertical-align:top;text-align:right;">{System.Net.WebUtility.HtmlEncode(value)}</td>
             </tr>
             """;
+}
+
+static string FormatarMoeda(decimal valor)
+{
+    return valor.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"));
+}
+
+static string FormatarDataHoraCuiaba(DateTimeOffset dataHora)
+{
+    return dataHora.ToString("dd/MM/yyyy HH:mm");
 }
 
 app.MapGet("/contas/pdf", async (
@@ -706,27 +722,30 @@ app.MapPost("/email/test", async (GmailEmailSender emailSender, HttpRequest requ
 
 static string MontarHtmlEmailTeste()
 {
+    var dataNotificacao = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-4));
+
     return $$"""
              <!doctype html>
              <html lang="pt-BR">
-             <body style="margin:0;background:#f3f4f6;font-family:Segoe UI,Arial,sans-serif;color:#172033;">
-               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:28px 12px;">
+             <body style="margin:0;background:#eef1f5;font-family:Segoe UI,Arial,sans-serif;color:#182033;">
+               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef1f5;padding:24px 10px;">
                  <tr>
                    <td align="center">
-                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #dde3ea;border-radius:16px;overflow:hidden;">
                        <tr>
-                         <td style="padding:26px 28px;background:#111827;color:#ffffff;">
-                           <div style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Contas Mensais</div>
-                           <h1 style="margin:8px 0 0;font-size:26px;line-height:1.2;font-weight:700;">Teste de envio realizado</h1>
+                         <td style="padding:28px;background:#273142;color:#ffffff;">
+                           <div style="font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#b8c2d3;">Contas Mensais</div>
+                           <h1 style="margin:10px 0 0;font-size:28px;line-height:1.2;font-weight:700;">Teste de envio realizado</h1>
                          </td>
                        </tr>
                        <tr>
                          <td style="padding:26px 28px;">
-                           <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.6;">
-                             A integracao com a Gmail API esta funcionando corretamente.
+                           <div style="display:inline-block;padding:8px 13px;border-radius:999px;background:#0f766e;color:#ffffff;font-size:13px;font-weight:700;letter-spacing:.04em;">ONLINE</div>
+                           <p style="margin:18px 0 0;color:#536173;font-size:15px;line-height:1.6;">
+                             A integração com a Gmail API está funcionando corretamente.
                            </p>
-                           <p style="margin:22px 0 0;color:#6b7280;font-size:13px;">
-                             Notificacao gerada em {{DateTimeOffset.Now:dd/MM/yyyy HH:mm:ss zzz}}.
+                           <p style="margin:22px 0 0;color:#697586;font-size:13px;">
+                             Notificação gerada em {{FormatarDataHoraCuiaba(dataNotificacao)}}.
                            </p>
                          </td>
                        </tr>
