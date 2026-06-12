@@ -31,7 +31,7 @@ const SincronizadorOffline = () => {
 
   return (
     <div className="offline-banner">
-      <span className="offline-banner-text">Voce possui acoes offline pendentes.</span>
+      <span className="offline-banner-text">Você possui ações offline pendentes.</span>
       <button type="button" className="offline-banner-btn" onClick={sincronizar}>
         Sincronizar agora
       </button>

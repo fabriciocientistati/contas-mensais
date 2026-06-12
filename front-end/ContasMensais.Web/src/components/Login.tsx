@@ -55,9 +55,9 @@ function Login() {
         expiresAt: data.expiresAt,
       });
 
-      toast.success('Acesso liberado.');
+      toast.success('Login realizado com sucesso.');
     } catch {
-      toast.error('E-mail ou senha invalidos.');
+      toast.error('E-mail ou senha incorretos.');
     } finally {
       setLoading(false);
     }
@@ -75,14 +75,14 @@ function Login() {
       const authenticated = await authenticateWithPlatformBiometrics(biometricLoginState.credential);
 
       if (!authenticated) {
-        toast.error('Nao foi possivel confirmar a biometria.');
+        toast.error('Não foi possível confirmar a biometria.');
         return;
       }
 
       unlockAuthSessionWithBiometrics();
-      toast.success('Acesso liberado pela biometria.');
+      toast.success('Login realizado com biometria.');
     } catch {
-      toast.error('Biometria cancelada ou indisponivel.');
+      toast.error('Biometria cancelada ou indisponível.');
     } finally {
       setBiometricLoading(false);
     }
@@ -94,7 +94,7 @@ function Login() {
         <div className="login-badge">Contas Mensais</div>
         <h1>Acesse seu painel</h1>
         <p className="login-subtitle">
-          Entre com o usuario configurado no Railway para liberar seus dados financeiros.
+          Entre com seu e-mail e senha para acompanhar suas contas, receitas e vencimentos.
         </p>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -145,8 +145,7 @@ function Login() {
         )}
 
         <p className="login-note">
-          Ative a biometria depois do login por senha para desbloquear este dispositivo com Face ID,
-          Touch ID ou leitor digital.
+          Em dispositivos compatíveis, você pode ativar Face ID, Touch ID ou leitor digital após o login.
         </p>
       </section>
     </main>

@@ -30,7 +30,7 @@ function GerenciadorUsuarios({ aberto, fechando, onFechar }: GerenciadorUsuarios
         setUsuarios(Array.isArray(response.data) ? response.data : []);
       })
       .catch(() => {
-        toast.error('Erro ao carregar usuarios.');
+        toast.error('Erro ao carregar usuários.');
       })
       .finally(() => {
         setCarregando(false);
@@ -68,18 +68,18 @@ function GerenciadorUsuarios({ aberto, fechando, onFechar }: GerenciadorUsuarios
       setUsuarios((usuariosAtuais) => [...usuariosAtuais, data]
         .sort((usuarioA, usuarioB) => usuarioA.nome.localeCompare(usuarioB.nome)));
       limparFormulario();
-      toast.success('Usuario cadastrado com sucesso.');
+      toast.success('Usuário cadastrado com sucesso.');
     } catch (error) {
       const status = typeof error === 'object' && error !== null && 'response' in error
         ? (error as { response?: { status?: number } }).response?.status
         : undefined;
 
       if (status === 409) {
-        toast.error('Ja existe um usuario com este e-mail.');
+        toast.error('Já existe um usuário com este e-mail.');
         return;
       }
 
-      toast.error('Erro ao cadastrar usuario.');
+      toast.error('Erro ao cadastrar usuário.');
     } finally {
       setSalvando(false);
     }
@@ -98,7 +98,7 @@ function GerenciadorUsuarios({ aberto, fechando, onFechar }: GerenciadorUsuarios
     >
       <div className={`modal usuarios-modal ${fechando ? 'closing' : ''}`} onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">Usuarios</h3>
+          <h3 className="modal-title">Usuários</h3>
           <button type="button" className="modal-close" onClick={onFechar}>
             x
           </button>
@@ -112,7 +112,7 @@ function GerenciadorUsuarios({ aberto, fechando, onFechar }: GerenciadorUsuarios
                 type="text"
                 value={nome}
                 onChange={(event) => setNome(event.target.value)}
-                placeholder="Nome do usuario"
+                placeholder="Nome do usuário"
                 autoComplete="name"
               />
             </label>
@@ -129,28 +129,28 @@ function GerenciadorUsuarios({ aberto, fechando, onFechar }: GerenciadorUsuarios
             </label>
 
             <label>
-              Senha temporaria
+              Senha temporária
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Minimo de 8 caracteres"
+                placeholder="Mínimo de 8 caracteres"
                 autoComplete="new-password"
               />
             </label>
 
             <button type="submit" disabled={salvando}>
-              {salvando ? 'Cadastrando...' : 'Cadastrar usuario'}
+              {salvando ? 'Cadastrando...' : 'Cadastrar usuário'}
             </button>
           </form>
 
           <div className="usuarios-lista">
-            <h4>Usuarios cadastrados</h4>
+            <h4>Usuários cadastrados</h4>
 
             {carregando && <p className="usuarios-status">Carregando...</p>}
 
             {!carregando && usuarios.length === 0 && (
-              <p className="usuarios-status">Nenhum usuario cadastrado.</p>
+              <p className="usuarios-status">Nenhum usuário cadastrado.</p>
             )}
 
             {!carregando && usuarios.map((usuario) => (

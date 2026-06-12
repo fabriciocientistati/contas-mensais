@@ -89,7 +89,7 @@ const FormularioNovaConta = ({ ano, mes, contaParaEditar, onContasSalvas }: Prop
     }
 
     resetarFormulario();
-  } catch (err: any) {
+  } catch (err) {
     handleApiError(err, setErrors);
   }
 };

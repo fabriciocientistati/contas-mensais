@@ -130,10 +130,10 @@ function App() {
           <button
             className="btn-usuarios"
             onClick={abrirUsuarios}
-            title="Gerenciar usuarios de acesso"
+            title="Gerenciar usuários de acesso"
           >
             <FaUsers aria-hidden="true" />
-            Usuarios
+            Usuários
           </button>
           {biometricAvailable && (
             <button

@@ -1,11 +1,21 @@
 import { toast } from 'react-toastify';
 
+type ApiErrorResponse = {
+    response?: {
+        status?: number;
+        data?: {
+            errors?: Record<string, string[]>;
+        };
+    };
+};
+
 export function handleApiError(
-    error: any,
+    error: unknown,
     setErrors?: (errors: Record<string, string[]>) => void
 ) {
-    const status = error.response?.status;
-    const data = error.response?.data;
+    const apiError = error as ApiErrorResponse;
+    const status = apiError.response?.status;
+    const data = apiError.response?.data;
 
     if ((status === 400 || status === 422) && data?.errors) {
         setErrors?.(data.errors);

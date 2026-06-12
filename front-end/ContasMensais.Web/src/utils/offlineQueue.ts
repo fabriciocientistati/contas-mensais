@@ -3,7 +3,7 @@ import api from '../services/api';
 export type OfflineAction = {
   method: 'POST' | 'PUT';
   url: string;
-  data?: any;
+  data?: Record<string, unknown>;
 };
 
 const KEY = 'offline-queue';
