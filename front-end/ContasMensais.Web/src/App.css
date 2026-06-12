@@ -926,6 +926,97 @@ input, select, button {
   padding: 0;
 }
 
+.usuarios-modal {
+  width: min(560px, 100%);
+}
+
+.usuarios-form {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.usuarios-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.usuarios-form input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: #0b1220;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.usuarios-form input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+}
+
+.usuarios-form button {
+  min-height: 46px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary);
+  color: #0b0f19;
+  cursor: pointer;
+  font-weight: 800;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.usuarios-form button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.usuarios-form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.usuarios-lista {
+  display: grid;
+  gap: 10px;
+}
+
+.usuarios-lista h4 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+
+.usuarios-status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.usuario-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #0b1220;
+}
+
+.usuario-item strong {
+  color: var(--text);
+}
+
+.usuario-item span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 @media (min-width: 640px) {
   .modal-overlay {
     align-items: center;
@@ -1073,7 +1164,8 @@ input, select, button {
   justify-content: flex-end;
 }
 
-.btn-biometria {
+.btn-biometria,
+.btn-usuarios {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1087,14 +1179,21 @@ input, select, button {
   transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 }
 
-.btn-biometria:hover:not(:disabled) {
+.btn-biometria:hover:not(:disabled),
+.btn-usuarios:hover:not(:disabled) {
   border-color: var(--accent);
   transform: translateY(-1px);
 }
 
-.btn-biometria:disabled {
+.btn-biometria:disabled,
+.btn-usuarios:disabled {
   opacity: 0.72;
   cursor: not-allowed;
+}
+
+.btn-usuarios {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.34);
 }
 
 .login-page {

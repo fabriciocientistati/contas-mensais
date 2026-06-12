@@ -1,6 +1,9 @@
-﻿import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { useEffect, useRef, useState } from 'react';
+import { FaFingerprint, FaUsers } from 'react-icons/fa';
+import { ToastContainer, toast } from 'react-toastify';
 import './App.css';
+import GerenciadorUsuarios from './components/GerenciadorUsuarios';
 import ListaContas from './components/ListaContas';
 import Login from './components/Login';
 import SincronizadorOffline from './components/SincronizadorOffline';
@@ -11,9 +14,6 @@ import {
   registerPlatformBiometricCredential,
 } from './services/deviceBiometrics';
 import { processQueue } from './utils/offlineQueue';
-import { useEffect, useState } from 'react';
-import { FaFingerprint } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 
 function App() {
   const [session, setSession] = useState(() => getAuthSession());
@@ -23,6 +23,9 @@ function App() {
     return Boolean(session && biometricCredential?.email === session.email);
   });
   const [biometricSaving, setBiometricSaving] = useState(false);
+  const [usuariosAberto, setUsuariosAberto] = useState(false);
+  const [usuariosFechando, setUsuariosFechando] = useState(false);
+  const timeoutFecharUsuarios = useRef<number | null>(null);
 
   useEffect(() => {
     const syncSession = () => setSession(getAuthSession());
@@ -58,6 +61,14 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (timeoutFecharUsuarios.current) {
+        window.clearTimeout(timeoutFecharUsuarios.current);
+      }
+    };
+  }, []);
+
   async function handleEnableBiometrics() {
     if (!session) {
       return;
@@ -74,6 +85,29 @@ function App() {
     } finally {
       setBiometricSaving(false);
     }
+  }
+
+  function abrirUsuarios() {
+    if (timeoutFecharUsuarios.current) {
+      window.clearTimeout(timeoutFecharUsuarios.current);
+      timeoutFecharUsuarios.current = null;
+    }
+
+    setUsuariosFechando(false);
+    setUsuariosAberto(true);
+  }
+
+  function fecharUsuarios() {
+    if (!usuariosAberto || usuariosFechando) {
+      return;
+    }
+
+    setUsuariosFechando(true);
+    timeoutFecharUsuarios.current = window.setTimeout(() => {
+      setUsuariosAberto(false);
+      setUsuariosFechando(false);
+      timeoutFecharUsuarios.current = null;
+    }, 200);
   }
 
   if (!session) {
@@ -93,6 +127,14 @@ function App() {
           <h1>Controle de Contas Mensais</h1>
         </div>
         <div className="app-header-actions">
+          <button
+            className="btn-usuarios"
+            onClick={abrirUsuarios}
+            title="Gerenciar usuarios de acesso"
+          >
+            <FaUsers aria-hidden="true" />
+            Usuarios
+          </button>
           {biometricAvailable && (
             <button
               className="btn-biometria"
@@ -109,6 +151,11 @@ function App() {
           </button>
         </div>
       </header>
+      <GerenciadorUsuarios
+        aberto={usuariosAberto}
+        fechando={usuariosFechando}
+        onFechar={fecharUsuarios}
+      />
       <ListaContas />
       <SincronizadorOffline />
       <button className="btn-flutuante" onClick={() => window.scrollTo(0, 0)}>

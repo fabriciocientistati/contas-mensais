@@ -186,6 +186,65 @@ app.MapPost("/auth/login", async (
     });
 }).AllowAnonymous();
 
+app.MapGet("/usuarios", async (AppDbContext db) =>
+{
+    var usuarios = await db.Usuarios
+        .AsNoTracking()
+        .OrderBy(usuario => usuario.Nome)
+        .ThenBy(usuario => usuario.Email)
+        .Select(usuario => new UsuarioResponse
+        {
+            Id = usuario.Id,
+            Email = usuario.Email,
+            Nome = usuario.Nome,
+            CriadoEm = usuario.CriadoEm
+        })
+        .ToListAsync();
+
+    return Results.Ok(usuarios);
+});
+
+app.MapPost("/usuarios", async (
+    [FromBody] CreateUsuarioRequest request,
+    AppDbContext db,
+    PasswordHasher passwordHasher) =>
+{
+    var email = request.Email.Trim().ToLowerInvariant();
+    var nome = request.Nome.Trim();
+
+    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
+        return Results.BadRequest("Informe e-mail e senha.");
+
+    if (request.Password.Length < 8)
+        return Results.BadRequest("A senha precisa ter pelo menos 8 caracteres.");
+
+    if (string.IsNullOrWhiteSpace(nome))
+        nome = email;
+
+    var usuarioExiste = await db.Usuarios.AnyAsync(usuario => usuario.Email == email);
+
+    if (usuarioExiste)
+        return Results.Conflict("Ja existe um usuario cadastrado com este e-mail.");
+
+    var usuario = new Usuario
+    {
+        Email = email,
+        Nome = nome,
+        PasswordHash = passwordHasher.Hash(request.Password)
+    };
+
+    db.Usuarios.Add(usuario);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/usuarios/{usuario.Id}", new UsuarioResponse
+    {
+        Id = usuario.Id,
+        Email = usuario.Email,
+        Nome = usuario.Nome,
+        CriadoEm = usuario.CriadoEm
+    });
+});
+
 app.MapGet("/", async (AppDbContext db) =>
 {
     return await db.Contas.ToListAsync();
