@@ -1065,6 +1065,38 @@ input, select, button {
   transform: translateY(-1px);
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-biometria {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-biometria:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.btn-biometria:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 .login-page {
   min-height: 100vh;
   display: grid;
@@ -1176,6 +1208,65 @@ input, select, button {
   cursor: not-allowed;
 }
 
+.biometric-login {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.biometric-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.biometric-divider::before,
+.biometric-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.biometric-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.34);
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.biometric-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.biometric-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.biometric-email {
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .login-note {
   margin: 18px 0 0;
   font-size: 0.88rem;
@@ -1185,6 +1276,10 @@ input, select, button {
   .app-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .app-header-actions {
+    justify-content: flex-start;
   }
 
   .btn-sair {
